@@ -8,6 +8,6 @@
  */
 window.IELT_CONFIG = {
   checkpoints: { vr: "COMPASS", vrAlt: "ATLAS", ar: "LANTERN", arAlt: "BEACON" },
-  portalUrl: "",
-  siteVersion: "1.2.0"
+  portalUrl: "https://script.google.com/macros/s/AKfycbzbGl28h4voJ_WeEz5_ts7j1KoHqwW-iJ8YGEyYDSZe8y8vbIk0sm-wwEei7UyQo-8X/exec",
+  siteVersion: "1.2.1"
 };
