@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virtual City: static version · Immersive ELT Design Lab</title>
+<link rel="stylesheet" href="../css/site.css">
+<style>.views{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin:.6rem 0 1rem}.views figure{margin:0}.views figcaption{font-size:.85rem;color:#44506b}details.pt{border:1px solid var(--line);border-radius:10px;padding:.2rem .8rem;margin:.5rem 0;background:#fff}details.pt>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:.5rem;font-weight:700}</style>
+</head>
+<body>
+<header class="topbar"><div><h1>The Virtual City Experience: static version</h1><div class="sub">Accessible alternative to the 360° viewer</div></div></header>
+<main class="wrap" id="main">
+  <div class="notice alt"><strong>This page is not virtual reality.</strong> It presents the same three scenes as still pictures with text descriptions, the same audio with transcripts, and the same tasks. Use it if moving 360° views are uncomfortable, if the viewer does not load, or if you use a screen reader or keyboard only. <a href="../vr/index.html">Open the 360° viewer instead</a>.</div>
+  <p class="small" id="disc"></p>
+</main>
+<script src="../config.js"></script><script src="../content/city.js"></script><script src="../js/common.js"></script>
+<script>
+(function () {
+  var I = window.IELT, el = I.el, C = window.CITY, main = document.getElementById("main");
+  document.getElementById("disc").textContent = C.disclaimer;
+  var opened = I.store("ielt_vralt_opened") || {}, done = el("div", { id: "done" });
+  function check() {
+    var scenes = {}, total = 0;
+    C.scenes.forEach(function (s) { s.hotspots.forEach(function (h) { if (opened[h.id]) { scenes[s.id] = 1; total++; } }); });
+    var ok = Object.keys(scenes).length >= C.vrCompletion.minScenes && total >= C.vrCompletion.minHotspots;
+    I.report("vr", { mode: "vr-alt", opened: Object.keys(opened), scenes: Object.keys(scenes), total: total, complete: ok });
+    done.innerHTML = "";
+    done.appendChild(ok ? I.checkpointBox(I.config.checkpoints.vrAlt, "Virtual City (static version)") : el("p", { class: "notice", role: "status", text: "Open at least one point in each of the three scenes and four points in total (" + total + " opened so far) to receive your checkpoint word." }));
+  }
+  C.scenes.forEach(function (s) {
+    var sec = el("section", { class: "card", "aria-labelledby": "h-" + s.id }, [el("h2", { id: "h-" + s.id, text: "Scene " + s.letter + ": " + s.title }), el("p", { text: s.summary })]);
+    var v = el("div", { class: "views" });
+    s.views.forEach(function (w) { v.appendChild(el("figure", null, [el("img", { src: w.file, alt: w.alt, loading: "lazy" }), el("figcaption", { text: w.alt })])); });
+    sec.appendChild(v);
+    s.hotspots.filter(function (h) { return h.type !== "go"; }).forEach(function (h) {
+      var d = el("details", { class: "pt" }, [el("summary", null, [el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title })])]);
+      d.appendChild(I.detail(h).node);
+      d.addEventListener("toggle", function () { if (d.open) { opened[h.id] = true; I.store("ielt_vralt_opened", opened); check(); } });
+      sec.appendChild(d);
+    });
+    main.appendChild(sec);
+  });
+  main.appendChild(done); check();
+})();
+</script>
+</body>
+</html>

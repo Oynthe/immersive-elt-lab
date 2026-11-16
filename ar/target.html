@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AR targets · Immersive ELT Design Lab</title>
+<link rel="stylesheet" href="../css/site.css">
+<style>
+  body{background:#fff}
+  .stage{display:flex;flex-direction:column;align-items:center;gap:.8rem;padding:.8rem}
+  .stage img{width:min(100%,calc((100vh - 190px) * 1.6));border:1px solid #ccc;box-shadow:0 2px 12px #0002}
+  .bar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;justify-content:center}
+  .bar button[aria-pressed="true"]{background:var(--navy);color:#fff}
+  .qr{display:flex;gap:1rem;align-items:center;justify-content:center;flex-wrap:wrap}
+  .qr #code svg, .qr #code img{width:132px;height:132px}
+</style>
+</head>
+<body>
+<header class="topbar"><div><h1>Augmented City: targets</h1><div class="sub">Keep this page open on a second screen. Point your phone camera at the picture.</div></div></header>
+<main class="stage">
+  <div class="bar" role="group" aria-label="Choose a target" id="pick"></div>
+  <img id="img" alt="">
+  <div class="qr">
+    <div id="code" aria-hidden="true"></div>
+    <div>
+      <p><strong>On your phone:</strong> scan this code, or open<br><span id="url" style="word-break:break-all"></span></p>
+      <p class="small">Tip: set this screen to full brightness and avoid reflections. No second device? <a href="../alt/ar.html">Use the non-camera version</a>. Prefer paper? <a href="../targets/print.html">Print the targets</a>.</p>
+    </div>
+  </div>
+</main>
+<script src="../config.js"></script>
+<script src="../content/city.js"></script>
+<script src="../js/common.js"></script>
+<script src="../vendor/qrcode/qrcode.js"></script>
+<script>
+(function () {
+  var I = window.IELT, el = I.el, S = window.CITY.arScenarios;
+  var ALT = {
+    brochure: "Target A, a printed brochure titled Lindenbrück in one afternoon, with photographs of the Market Hall, the Palm House and the Clock Tower and their opening times.",
+    timetable: "Target B, a printed departures timetable for Lindenbrück Central listing six trains with times, destinations and platforms, beside a photograph of a train.",
+    museum: "Target C, a museum object label showing a photograph of a painted ceramic jar and the title The Storytelling Jar."
+  };
+  var cur = I.qs("t") || "brochure";
+  var pick = document.getElementById("pick"), img = document.getElementById("img");
+  function show(id) {
+    cur = id; var sc = S.filter(function (s) { return s.id === id; })[0] || S[0];
+    img.src = sc.target; img.alt = ALT[sc.id];
+    Array.prototype.forEach.call(pick.children, function (b) { b.setAttribute("aria-pressed", b.dataset.id === sc.id ? "true" : "false"); });
+  }
+  S.forEach(function (s) { var b = el("button", { class: "btn secondary", type: "button", "data-id": s.id, text: s.letter + " · " + s.title, onclick: function () { show(s.id); } }); pick.appendChild(b); });
+  var arUrl = new URL("index.html", location.href).href;
+  document.getElementById("url").textContent = arUrl;
+  try { var q = qrcode(0, "M"); q.addData(arUrl); q.make(); document.getElementById("code").innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); } catch (e) {}
+  show(cur);
+})();
+</script>
+</body>
+</html>

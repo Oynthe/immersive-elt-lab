@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Augmented City: non-camera version · Immersive ELT Design Lab</title>
+<link rel="stylesheet" href="../css/site.css">
+<style>
+.tgt{position:relative;max-width:820px;margin:.6rem auto}.tgt img{display:block;width:100%;border:1px solid #ccc}
+.pin{position:absolute;transform:translate(-50%,-50%);min-width:44px;min-height:44px;border-radius:999px;border:3px solid #fff;color:#fff;font-weight:800;box-shadow:0 2px 8px #0007;padding:0 .7rem}
+.pin.done{box-shadow:0 0 0 4px #7bd88f}
+.out{margin:.6rem 0}
+</style>
+</head>
+<body>
+<header class="topbar"><div><h1>The Augmented City Experience: non-camera version</h1><div class="sub">Accessible alternative to camera-based AR</div></div></header>
+<main class="wrap" id="main">
+  <div class="notice alt"><strong>This page is not augmented reality.</strong> Nothing here is attached to a real object through a camera. It is a 2D walkthrough of the same overlay content, for participants who have only one device, no camera, restricted camera permission or limited bandwidth, or who use a screen reader. <a href="../ar/index.html">Open the camera version instead</a>.</div>
+  <p>In the camera version, the numbered items below float above the printed page and stay attached to it as the phone moves, and the museum jar appears as a 3D object that can be viewed from all sides. Keep that difference in mind when you analyse what AR adds.</p>
+</main>
+<script src="../config.js"></script><script src="../content/city.js"></script><script src="../js/common.js"></script>
+<script>
+(function () {
+  var I = window.IELT, el = I.el, C = window.CITY, main = document.getElementById("main");
+  var opened = I.store("ielt_aralt_opened") || {}, done = el("div");
+  var ALT = { brochure: "Printed brochure, Lindenbrück in one afternoon: Market Hall, Palm House and Clock Tower with printed opening times and prices.", timetable: "Printed departures timetable for Lindenbrück Central: six trains with times, destinations and platforms.", museum: "Museum object label with a photograph of a painted ceramic jar, titled The Storytelling Jar." };
+  function check() {
+    var n = Object.keys(opened).length, ok = n >= C.arCompletion.minItems;
+    I.report("ar", { mode: "ar-alt", opened: Object.keys(opened), complete: ok });
+    done.innerHTML = "";
+    done.appendChild(ok ? I.checkpointBox(I.config.checkpoints.arAlt, "Augmented City (non-camera version)") : el("p", { class: "notice", role: "status", text: "Open at least " + C.arCompletion.minItems + " overlay items (" + n + " opened so far) to receive your checkpoint word." }));
+  }
+  C.arScenarios.forEach(function (s) {
+    var out = el("div", { class: "out", "aria-live": "polite" });
+    var box = el("div", { class: "tgt" }, [el("img", { src: s.target, alt: ALT[s.id] })]);
+    s.items.forEach(function (it, i) {
+      var b = el("button", { class: "pin" + (opened[it.id] ? " done" : ""), type: "button", style: "left:" + (Math.min(it.u, 0.94) * 100) + "%;top:" + (it.v * 100) + "%;background:" + it.colour + (it.colour === "#e8a838" ? ";color:#17233c" : ""), "aria-label": "Overlay item " + (i + 1) + ": " + it.label,
+        text: it.kind === "audio" ? "♪" : String(i + 1), onclick: function () {
+          opened[it.id] = true; I.store("ielt_aralt_opened", opened); b.classList.add("done");
+          out.innerHTML = ""; var d = I.detail(it); out.appendChild(el("div", { class: "card" }, [d.node])); d.heading.focus(); check();
+        } });
+      box.appendChild(b);
+    });
+    main.appendChild(el("section", { class: "card", "aria-labelledby": "h-" + s.id }, [
+      el("h2", { id: "h-" + s.id, text: "AR " + s.letter + ": " + s.title }), el("p", { text: s.printed }), box, out,
+      el("div", { class: "task" }, [el("h4", { text: "Learner task" }), el("p", { text: s.learnerTask })]),
+      el("div", { class: "task lens" }, [el("h4", { text: "Think as a teacher" }), el("p", { text: s.lens })])]));
+  });
+  main.appendChild(done); main.appendChild(el("p", { class: "small", text: C.disclaimer })); check();
+})();
+</script>
+</body>
+</html>

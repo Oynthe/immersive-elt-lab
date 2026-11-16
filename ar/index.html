@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Augmented City Experience · Immersive ELT Design Lab</title>
+<link rel="stylesheet" href="../css/site.css">
+<style>
+  html,body{overflow:hidden;background:#0c1322;color:#fff}
+  #ar{position:fixed;inset:0;overflow:hidden}
+  #start{position:fixed;inset:0;z-index:40;background:var(--navy);overflow:auto}
+  #start .wrap{max-width:640px}
+  #start h1{font-size:1.5rem;margin-top:.5rem}
+  #start ol{padding-left:1.2rem}
+  #start li{margin:.35rem 0}
+  #start .card{color:var(--ink)}
+  #hud{position:fixed;left:0;right:0;top:0;z-index:20;padding:.6rem .8rem;display:none;gap:.5rem;align-items:center;background:linear-gradient(#0c1322e6,#0c132200)}
+  #hud.on{display:flex}
+  #hud .name{font-weight:800}
+  #hud .state{margin-left:auto;background:#0c1322e6;border-radius:999px;padding:.3rem .8rem;font-size:.85rem;font-weight:700}
+  #chips{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:.6rem .6rem calc(.6rem + env(safe-area-inset-bottom));display:none;gap:.4rem;overflow-x:auto;background:linear-gradient(#0c132200,#0c1322f2 40%)}
+  #chips.on{display:flex}
+  #chips button{flex:0 0 auto;min-height:48px;border-radius:999px;border:2px solid #fff;background:#0c1322cc;color:#fff;font-weight:700;padding:.3rem .9rem}
+  #chips button.done{border-color:#7bd88f}
+  #scan{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:15;text-align:center;display:none;width:min(80vw,420px)}
+  #scan.on{display:block}
+  #scan .frame{aspect-ratio:16/10;border:3px dashed #fff;border-radius:16px;margin-bottom:.6rem;box-shadow:0 0 0 2000px #0c132255}
+  #sheet{position:fixed;left:0;right:0;bottom:0;z-index:30;max-height:72%;overflow:auto;background:var(--paper);color:var(--ink);border-radius:18px 18px 0 0;padding:1rem 1.1rem 1.5rem;transform:translateY(105%);transition:transform .25s}
+  #sheet.open{transform:none}
+  #sheet .close{float:right;min-width:44px;min-height:44px;border-radius:50%;border:0;background:var(--navy);color:#fff;font-size:1.2rem;font-weight:800}
+  #tools{position:fixed;left:.6rem;bottom:calc(4.6rem + env(safe-area-inset-bottom));z-index:20;display:none;gap:.4rem;flex-wrap:wrap}
+  #tools.on{display:flex}
+  #tools button{min-height:44px;border-radius:999px;border:2px solid #fff;background:#0c1322cc;color:#fff;font-weight:700;padding:.2rem .8rem;font-size:.85rem}
+  #hud .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  #hud .state{white-space:nowrap}
+  #scan a{color:#ffd166;font-weight:700}
+</style>
+<script type="importmap">
+{ "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/", "mindar-image-three": "../vendor/mindar/mindar-image-three.prod.js" } }
+</script>
+</head>
+<body>
+<div id="ar" aria-hidden="true"></div>
+
+<section id="start" aria-labelledby="st">
+  <div class="wrap">
+    <span class="badge" style="background:var(--amber);color:var(--navy)">Camera-based augmented reality</span>
+    <h1 id="st">The Augmented City Experience</h1>
+    <p>Your camera looks at a printed page of Lindenbrück. Live information, audio and a 3D museum object appear on top of it and stay attached to the page as you move.</p>
+    <div class="card">
+      <ol>
+        <li><strong>Show a target</strong> on a second screen (laptop, tablet, a groupmate's shared screen) or print it. In the portal, open <em>AR Explorer</em> and choose a target.</li>
+        <li><strong>Start the camera</strong> on this device and allow camera access.</li>
+        <li><strong>Point the camera</strong> at the whole page from about 30 to 50 cm. Open at least two overlay items.</li>
+      </ol>
+      <p class="small">Privacy: the camera image is analysed on your device only. Nothing is recorded, stored or uploaded.</p>
+      <p><button class="btn" id="go" type="button">Start camera</button></p>
+      <p id="err" role="alert" class="notice alt" style="display:none"></p>
+    </div>
+    <p><a class="btn secondary" href="target.html">Show a target on this screen</a>
+       <a class="btn secondary" href="../alt/ar.html">No camera? Use the non-camera version</a></p>
+    <p class="small" style="color:#cbd5e8" id="disc"></p>
+  </div>
+</section>
+
+<div id="hud"><span class="name" id="scName">Looking for a target…</span><span class="state" id="state" role="status" aria-live="polite">0 items opened</span></div>
+<div id="tools">
+  <button type="button" id="flat" aria-pressed="false">Page is flat on a desk</button>
+  <button type="button" id="spin" aria-pressed="true">Pause rotation</button>
+</div>
+<div id="scan"><div class="frame"></div><strong>Point the camera at a Lindenbrück brochure, timetable or object label</strong><br><a href="../alt/ar.html">Cannot scan? Use the non-camera version</a></div>
+<nav id="chips" aria-label="Overlay items for the page in view"></nav>
+<aside id="sheet" aria-label="Overlay item details"></aside>
+
+<script src="../config.js"></script>
+<script src="../content/city.js"></script>
+<script src="../js/common.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { MindARThree } from "mindar-image-three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const I = window.IELT, el = I.el, CITY = window.CITY;
+const H = 0.625;                                   // target height when width = 1
+const OFFSET = { brochure: { live: [0, 0.2], audio: [0, -0.16] }, timetable: { live: [0.27, 0], audio: [0, -0.16] }, museum: { note: [-0.33, 0], audio: [0.02, -0.2] } };
+const state = { started: false, found: null, opened: I.store("ielt_ar_opened") || {}, complete: false, flat: false, spin: true, everFound: {} };
+window.__ar = state;
+document.getElementById("disc").textContent = CITY.disclaimer;
+const byId = {}; CITY.arScenarios.forEach(s => s.items.forEach(i => { byId[i.id] = i; i.scenario = s.id; }));
+const pickables = [], anchors = [], spinners = [];
+let mindar = null;
+
+function cardTexture(item) {
+  const c = document.createElement("canvas"); c.width = 640; c.height = 280;
+  const g = c.getContext("2d");
+  const r = 36;
+  g.fillStyle = "rgba(12,19,34,0.94)";
+  g.beginPath(); g.moveTo(r, 0); g.arcTo(640, 0, 640, 280, r); g.arcTo(640, 280, 0, 280, r); g.arcTo(0, 280, 0, 0, r); g.arcTo(0, 0, 640, 0, r); g.fill();
+  g.fillStyle = item.colour; g.fillRect(0, 0, 18, 280);
+  g.font = "800 30px system-ui, sans-serif"; const cw = g.measureText(item.chip).width + 36;
+  g.beginPath(); g.roundRect ? g.roundRect(44, 28, cw, 50, 12) : g.rect(44, 28, cw, 50); g.fill();
+  g.fillStyle = (item.colour === "#e8a838") ? "#17233c" : "#ffffff"; g.textBaseline = "middle"; g.fillText(item.chip, 62, 54);
+  g.fillStyle = "#ffffff"; g.font = "800 50px system-ui, sans-serif"; g.fillText(item.lines[0], 44, 132, 570);
+  g.fillStyle = "#cbd5e8"; g.font = "600 40px system-ui, sans-serif"; g.fillText(item.lines[1] || "", 44, 204, 570);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
+function pinMesh(item, n) {
+  const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
+  g.fillStyle = item.colour; g.beginPath(); g.arc(64, 64, 54, 0, Math.PI * 2); g.fill();
+  g.lineWidth = 10; g.strokeStyle = "#fff"; g.stroke();
+  g.fillStyle = (item.colour === "#e8a838") ? "#17233c" : "#fff"; g.font = "800 62px system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(item.kind === "audio" ? "♪" : String(n), 64, 68);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.Mesh(new THREE.CircleGeometry(0.035, 32), new THREE.MeshBasicMaterial({ map: t, transparent: true }));
+}
+function buildScenario(sc, group) {
+  sc.items.forEach((item, idx) => {
+    const x = item.u - 0.5, y = (0.5 - item.v) * H;
+    const off = (OFFSET[sc.id] || {})[item.kind] || [0, 0.18];
+    const pin = pinMesh(item, idx + 1); pin.position.set(x, y, 0.01); pin.userData.itemId = item.id; group.add(pin); pickables.push(pin);
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.14), new THREE.MeshBasicMaterial({ map: cardTexture(item), transparent: true }));
+    card.position.set(x + off[0], y + off[1], 0.09); card.userData.itemId = item.id; card.userData.baseZ = 0.09; card.userData.phase = idx * 1.3;
+    group.add(card); pickables.push(card); spinners.push(card);
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, y, 0.01), new THREE.Vector3(x + off[0], y + off[1], 0.09)]), new THREE.LineBasicMaterial({ color: 0xffffff }));
+    group.add(line);
+  });
+}
+function proceduralJar() {
+  const pts = [[0.02, 0], [0.11, 0.01], [0.14, 0.05], [0.19, 0.16], [0.2, 0.24], [0.17, 0.33], [0.1, 0.39], [0.085, 0.42], [0.1, 0.44], [0.07, 0.46], [0.05, 0.5], [0.0, 0.52]].map(p => new THREE.Vector2(p[0], p[1]));
+  const c = document.createElement("canvas"); c.width = 512; c.height = 256; const g = c.getContext("2d");
+  g.fillStyle = "#f3ede0"; g.fillRect(0, 0, 512, 256); g.fillStyle = "#1b3a6b"; g.fillRect(0, 120, 512, 70);
+  for (let i = 0; i < 26; i++) { g.fillStyle = i % 2 ? "#d98a2b" : "#e8a838"; g.beginPath(); g.arc(20 * i + 10, 60 + 30 * Math.sin(i), 9, 0, 7); g.fill(); }
+  g.strokeStyle = "#1b3a6b"; g.lineWidth = 6; for (let i = 0; i < 14; i++) { g.beginPath(); g.arc(40 * i, 230, 18, Math.PI, 0); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+  const m = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), new THREE.MeshStandardMaterial({ map: t, roughness: 0.35 }));
+  m.position.y = -0.26; const holder = new THREE.Group(); holder.add(m); holder.scale.setScalar(0.7); return holder;
+}
+function addJar(sc, group) {
+  const pivot = new THREE.Group(); pivot.position.set(-0.1875, 0, 0.16); group.add(pivot);
+  const turn = new THREE.Group(); pivot.add(turn);
+  state.jarPivot = pivot; state.jarTurn = turn; state.jarSource = "loading";
+  const use = (obj, source) => { turn.add(obj); state.jarSource = source; };
+  new GLTFLoader().load(sc.model, (gltf) => {
+    const o = gltf.scene; const box = new THREE.Box3().setFromObject(o); const size = box.getSize(new THREE.Vector3()); const centre = box.getCenter(new THREE.Vector3());
+    const s = 0.36 / Math.max(size.x, size.y, size.z); o.scale.setScalar(s); o.position.sub(centre.multiplyScalar(s)); use(o, "glb");
+  }, undefined, () => use(proceduralJar(), "procedural"));
+}
+
+function openItem(id) {
+  const item = byId[id]; if (!item) return;
+  state.opened[id] = true; I.store("ielt_ar_opened", state.opened);
+  const sc = CITY.arScenarios.find(s => s.id === item.scenario);
+  const extra = el("div", null, [
+    el("div", { class: "task" }, [el("h4", { text: "Learner task" }), el("p", { text: sc.learnerTask })]),
+    el("div", { class: "task lens" }, [el("h4", { text: "Think as a teacher" }), el("p", { text: sc.lens })])]);
+  const d = I.detail(item, { extra });
+  const sheet = document.getElementById("sheet"); sheet.innerHTML = "";
+  sheet.appendChild(el("button", { class: "close", "aria-label": "Close details", text: "×", onclick: closeSheet }));
+  sheet.appendChild(d.node);
+  update();
+  if (state.complete) sheet.appendChild(I.checkpointBox(I.config.checkpoints.ar, "Augmented City"));
+  sheet.classList.add("open"); d.heading.focus();
+}
+function closeSheet() { const s = document.getElementById("sheet"); const a = s.querySelector("audio"); if (a) a.pause(); s.classList.remove("open"); }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+
+function update() {
+  const n = Object.keys(state.opened).filter(k => byId[k]).length;
+  state.complete = n >= CITY.arCompletion.minItems && Object.keys(state.everFound).length > 0;
+  document.getElementById("state").textContent = state.complete ? "Complete · word: " + I.config.checkpoints.ar : n + " of " + CITY.arCompletion.minItems + " items opened";
+  const sc = CITY.arScenarios.find(s => s.id === state.found);
+  document.getElementById("scName").textContent = sc ? sc.letter + " · " + sc.title : "Looking for a target…";
+  document.getElementById("scan").classList.toggle("on", state.started && !sc);
+  const chips = document.getElementById("chips"); chips.innerHTML = "";
+  if (sc) sc.items.forEach((it, i) => chips.appendChild(el("button", { type: "button", class: state.opened[it.id] ? "done" : "", onclick: () => openItem(it.id) }, [(it.kind === "audio" ? "♪ " : (i + 1) + " ") + it.label])));
+  chips.classList.toggle("on", !!sc);
+  document.getElementById("tools").classList.toggle("on", !!sc && !!sc.model);
+  I.report("ar", { mode: "ar", opened: Object.keys(state.opened), targetsFound: Object.keys(state.everFound), complete: state.complete });
+}
+
+async function start() {
+  const err = document.getElementById("err"); err.style.display = "none";
+  const btn = document.getElementById("go"); btn.disabled = true; btn.textContent = "Starting…";
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("This browser does not give web pages access to the camera.");
+    mindar = new MindARThree({ container: document.getElementById("ar"), imageTargetSrc: CITY.arTargetsFile, maxTrack: 1, uiLoading: "no", uiScanning: "no", uiError: "no", filterMinCF: 0.0005, filterBeta: 0.01, warmupTolerance: 3, missTolerance: 8 });
+    const { renderer, scene, camera } = mindar;
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x445066, 2.2));
+    const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.5, 1, 1); scene.add(dl);
+    CITY.arScenarios.forEach(sc => {
+      const a = mindar.addAnchor(sc.index); anchors.push(a);
+      buildScenario(sc, a.group);
+      if (sc.model) addJar(sc, a.group);
+      a.onTargetFound = () => { state.found = sc.id; state.everFound[sc.id] = true; update(); };
+      a.onTargetLost = () => { if (state.found === sc.id) state.found = null; update(); };
+    });
+    await mindar.start();
+    state.started = true;
+    document.getElementById("start").style.display = "none";
+    document.getElementById("hud").classList.add("on");
+    const ray = new THREE.Raycaster(), v = new THREE.Vector2();
+    renderer.domElement.addEventListener("pointerdown", (e) => {
+      const r = renderer.domElement.getBoundingClientRect();
+      v.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(v, camera);
+      const hit = ray.intersectObjects(pickables.filter(o => o.parent && o.parent.visible), false)[0];
+      if (hit) openItem(hit.object.userData.itemId);
+    });
+    const clock = new THREE.Clock();
+    renderer.setAnimationLoop(() => {
+      const t = clock.getElapsedTime();
+      spinners.forEach(c => { c.position.z = c.userData.baseZ + 0.012 * Math.sin(t * 1.6 + c.userData.phase); });
+      if (state.jarTurn && state.spin) state.jarTurn.rotation.y = t * 0.6;
+      renderer.render(scene, camera);
+    });
+    update();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Start camera";
+    const name = (e && e.name) || "";
+    let msg = "The camera could not be started. ";
+    if (name === "NotAllowedError") msg += "Camera permission was refused. Allow the camera for this site in your browser settings and try again, ";
+    else if (name === "NotFoundError" || name === "OverconstrainedError") msg += "No usable camera was found on this device, ";
+    else msg += "(" + ((e && e.message) || "unknown error") + ") Try another browser, ";
+    err.innerHTML = ""; err.appendChild(document.createTextNode(msg + "or use the ")); err.appendChild(el("a", { href: "../alt/ar.html", text: "non-camera version" })); err.appendChild(document.createTextNode("."));
+    err.style.display = "block"; state.error = name || String(e);
+  }
+}
+document.getElementById("go").addEventListener("click", start);
+document.getElementById("flat").addEventListener("click", (e) => {
+  state.flat = !state.flat; e.currentTarget.setAttribute("aria-pressed", String(state.flat));
+  if (state.jarPivot) state.jarPivot.rotation.x = state.flat ? Math.PI / 2 : 0;
+});
+document.getElementById("spin").addEventListener("click", (e) => {
+  state.spin = !state.spin; e.currentTarget.setAttribute("aria-pressed", String(state.spin)); e.currentTarget.textContent = state.spin ? "Pause rotation" : "Resume rotation";
+});
+document.addEventListener("visibilitychange", () => { if (document.hidden) closeSheet(); });
+</script>
+</body>
+</html>

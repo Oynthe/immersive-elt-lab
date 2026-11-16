@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Virtual City Experience · Immersive ELT Design Lab</title>
+<link rel="stylesheet" href="../vendor/pannellum/pannellum.css">
+<link rel="stylesheet" href="../css/site.css">
+<style>
+  html,body{overflow:hidden;background:#0c1322}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+  #bar{flex:0 0 auto}
+  body.embed #bar .sub{display:none}
+  #stage{position:relative;flex:1 1 auto;min-height:0}
+  #pano{position:absolute;inset:0}
+  .tabs{display:flex;gap:.4rem;margin-left:auto;flex-wrap:wrap}
+  .tabs button{min-height:44px;padding:.35rem .8rem;border-radius:999px;border:2px solid #fff3;background:transparent;color:#fff;font-weight:700}
+  .tabs button[aria-current="true"]{background:var(--amber);color:var(--navy);border-color:var(--amber)}
+  .tabs .count{font-weight:600;opacity:.85;margin-left:.3rem;font-size:.85em}
+  /* hotspots */
+  .hs{width:46px;height:46px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px #0008;display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer;margin:-23px 0 0 -23px}
+  .hs svg{width:24px;height:24px;pointer-events:none}
+  .hs.hs-listen{background:#1f7a6d}.hs.hs-look{background:#2b6cb0}.hs.hs-language{background:#7b4fb3}.hs.hs-decide{background:#c2452d}.hs.hs-lens{background:#17233c;border-color:var(--amber)}.hs.hs-go{background:#5b6b88}
+  .hs.done{box-shadow:0 0 0 4px #7bd88f, 0 2px 10px #0008}
+  .hs:after{content:"";position:absolute;inset:-9px;border-radius:50%;border:2px solid #fff9;animation:pulse 2.2s ease-out infinite}
+  .hs.done:after{display:none}
+  .hs span.tip{position:absolute;bottom:56px;left:50%;transform:translateX(-50%);background:#0c1322ee;color:#fff;font-size:.82rem;font-weight:700;padding:.3rem .6rem;border-radius:6px;white-space:nowrap;visibility:hidden}
+  .hs:hover span.tip,.hs:focus-visible span.tip{visibility:visible}
+  @keyframes pulse{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+  /* panel */
+  #panel{position:absolute;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--paper);box-shadow:-6px 0 24px #0006;transform:translateX(105%);transition:transform .25s;overflow:auto;padding:1rem 1.1rem 5rem;z-index:20}
+  #panel.open{transform:none}
+  #panel .close{position:sticky;top:0;float:right;min-width:44px;min-height:44px;border-radius:50%;border:0;background:var(--navy);color:#fff;font-size:1.2rem;font-weight:800}
+  @media(max-width:700px){#panel{top:auto;height:62%;width:100%;border-radius:18px 18px 0 0;transform:translateY(105%)}#panel.open{transform:none}}
+  /* guide */
+  #guideBtn{position:absolute;left:12px;bottom:12px;z-index:15}
+  #guide{position:absolute;left:12px;bottom:66px;z-index:15;width:min(330px,calc(100% - 24px));max-height:60%;overflow:auto;background:#0c1322f2;color:#fff;border-radius:14px;padding:.6rem;display:none}
+  #guide.open{display:block}
+  #guide h2{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin:.3rem .4rem .5rem;color:var(--amber)}
+  #guide p{font-size:.85rem;margin:.2rem .4rem .6rem;opacity:.9}
+  #guide button{display:flex;gap:.5rem;align-items:center;width:100%;text-align:left;min-height:44px;background:transparent;border:0;color:#fff;border-radius:8px;padding:.3rem .4rem}
+  #guide button:hover,#guide button:focus-visible{background:#ffffff1f}
+  #guide .tick{margin-left:auto;color:#7bd88f;font-weight:900}
+  #status{position:absolute;right:12px;bottom:12px;z-index:15;background:#0c1322e6;color:#fff;border-radius:999px;padding:.45rem .9rem;font-size:.88rem;font-weight:700}
+  #loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0c1322;color:#fff;z-index:30;text-align:center;padding:1rem}
+  #loader.hide{display:none}
+  #done{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:25;width:min(520px,calc(100% - 24px));display:none}
+  #done.show{display:block}
+  .pnlm-about-msg{display:none !important}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar" id="bar">
+    <div>
+      <h1>The Virtual City Experience</h1>
+      <div class="sub">Lindenbrück · drag to look around · open at least one point in every scene</div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Scenes"></nav>
+  </header>
+  <main id="stage">
+    <div id="pano" aria-label="360 degree scene. Use the Guide button for a keyboard and screen-reader friendly list of points."></div>
+    <div id="loader" role="status"><p><strong>Loading the scene…</strong></p><p class="small" style="color:#cbd5e8">Trouble loading? <a style="color:#ffd166" href="../alt/vr.html">Open the static version</a></p></div>
+    <div id="done"></div>
+    <button class="btn" id="guideBtn" aria-expanded="false" aria-controls="guide">Guide</button>
+    <nav id="guide" aria-label="Points in this scene"></nav>
+    <div id="status" role="status" aria-live="polite"></div>
+    <aside id="panel" aria-label="Point details" aria-live="polite"></aside>
+  </main>
+</div>
+<script src="../config.js"></script>
+<script src="../content/city.js"></script>
+<script src="../js/common.js"></script>
+<script src="../vendor/pannellum/pannellum.js"></script>
+<script>
+(function () {
+  "use strict";
+  var I = window.IELT, el = I.el, CITY = window.CITY;
+  if (I.qs("embed") === "1") document.body.classList.add("embed");
+  var ICON = {
+    listen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="14" width="5" height="7" rx="2"/><rect x="16.5" y="14" width="5" height="7" rx="2"/></svg>',
+    look: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    language: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/><path d="M8.5 10h7M8.5 14h4.5"/></svg>',
+    decide: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-8"/><path d="M12 13 5 6M12 13l7-7"/><path d="M5 10V6h4M19 10V6h-4"/></svg>',
+    lens: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/><path d="M22 9v6"/></svg>',
+    go: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'
+  };
+  var lite = I.qs("lite") === "1";
+  try {
+    var conn = navigator.connection || {};
+    if (conn.saveData || /(^|-)(2g|3g)$/.test(conn.effectiveType || "")) lite = true;
+    var gl = document.createElement("canvas").getContext("webgl");
+    if (gl && gl.getParameter(gl.MAX_TEXTURE_SIZE) < 3840) lite = true;
+  } catch (e) {}
+
+  var opened = I.store("ielt_vr_opened") || {};   // hotspotId -> true
+  var byId = {}, sceneOf = {}, nodes = {};
+  CITY.scenes.forEach(function (s) { s.hotspots.forEach(function (h) { byId[h.id] = h; sceneOf[h.id] = s.id; }); });
+  var panel = document.getElementById("panel"), guide = document.getElementById("guide"), guideBtn = document.getElementById("guideBtn");
+  var lastFocus = null, viewer = null, current = null, announcedDone = false;
+
+  function tooltip(div, h) {
+    div.classList.add("hs", "hs-" + h.type);
+    if (opened[h.id]) div.classList.add("done");
+    div.setAttribute("role", "button"); div.setAttribute("tabindex", "0");
+    div.setAttribute("aria-label", I.TYPE_LABEL[h.type] + ": " + h.title);
+    div.innerHTML = ICON[h.type] + '<span class="tip"></span>';
+    div.querySelector(".tip").textContent = h.title;
+    div.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(h, div); } });
+    nodes[h.id] = div;
+  }
+  function activate(h, node) {
+    if (h.type === "go") { viewer.loadScene(h.to); return; }
+    lastFocus = node || nodes[h.id] || guideBtn;
+    opened[h.id] = true; I.store("ielt_vr_opened", opened);
+    if (nodes[h.id]) nodes[h.id].classList.add("done");
+    var d = I.detail(h);
+    panel.innerHTML = "";
+    var close = el("button", { class: "close", "aria-label": "Close details", text: "×", onclick: closePanel });
+    panel.appendChild(close); panel.appendChild(d.node);
+    panel.classList.add("open"); d.heading.focus();
+    refresh();
+  }
+  function closePanel() {
+    var a = panel.querySelector("audio"); if (a) a.pause();
+    panel.classList.remove("open");
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && panel.classList.contains("open")) closePanel(); });
+
+  function progress() {
+    var total = 0, scenes = {};
+    Object.keys(opened).forEach(function (id) { if (byId[id] && byId[id].type !== "go") { total++; scenes[sceneOf[id]] = true; } });
+    var n = Object.keys(scenes).length, c = CITY.vrCompletion;
+    return { total: total, scenes: n, complete: n >= c.minScenes && total >= c.minHotspots, sceneIds: Object.keys(scenes) };
+  }
+  function refresh() {
+    var p = progress(), c = CITY.vrCompletion;
+    document.getElementById("status").textContent = p.complete ? "Tour complete" : ("Scenes " + p.scenes + "/" + c.minScenes + " · points " + p.total + "/" + c.minHotspots);
+    // tabs
+    var tabs = document.getElementById("tabs"); tabs.innerHTML = "";
+    CITY.scenes.forEach(function (s) {
+      var done = s.hotspots.filter(function (h) { return h.type !== "go" && opened[h.id]; }).length;
+      var all = s.hotspots.filter(function (h) { return h.type !== "go"; }).length;
+      var b = el("button", { type: "button", "aria-current": s.id === current ? "true" : "false", onclick: function () { if (s.id !== current) viewer.loadScene(s.id); } },
+        [s.letter + " · " + s.short, el("span", { class: "count", text: done + "/" + all })]);
+      tabs.appendChild(b);
+    });
+    // guide list
+    var sc = CITY.scenes.filter(function (s) { return s.id === current; })[0];
+    guide.innerHTML = "";
+    if (sc) {
+      guide.appendChild(el("h2", { text: sc.title }));
+      guide.appendChild(el("p", { text: sc.summary }));
+      sc.hotspots.forEach(function (h) {
+        guide.appendChild(el("button", { type: "button", onclick: function () {
+          if (h.type !== "go") viewer.lookAt(h.pitch, h.yaw, viewer.getHfov(), 700);
+          activate(h, guideBtn);
+        } }, [el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title }), opened[h.id] ? el("span", { class: "tick", "aria-label": "opened", text: "✓" }) : null]));
+      });
+    }
+    I.report("vr", { mode: "vr", opened: Object.keys(opened), scenes: p.sceneIds, total: p.total, complete: p.complete });
+    if (p.complete && !announcedDone) {
+      announcedDone = true;
+      var box = document.getElementById("done"); box.innerHTML = "";
+      var cp = I.checkpointBox(I.config.checkpoints.vr, "Virtual City tour");
+      cp.appendChild(el("br"));
+      cp.appendChild(el("button", { class: "btn", style: "margin-top:.5rem", text: "Keep exploring", onclick: function () { box.classList.remove("show"); } }));
+      box.appendChild(cp); box.classList.add("show");
+    }
+  }
+  guideBtn.addEventListener("click", function () {
+    var o = guide.classList.toggle("open"); guideBtn.setAttribute("aria-expanded", o ? "true" : "false");
+  });
+
+  var cfg = { default: { firstScene: CITY.scenes[0].id, sceneFadeDuration: 700, autoLoad: true, showControls: true, keyboardZoom: true, mouseZoom: true, hfov: 100, minHfov: 50, maxHfov: 110, minPitch: -78, maxPitch: 78, strings: { loadingLabel: "Loading the scene…" } }, scenes: {} };
+  CITY.scenes.forEach(function (s) {
+    cfg.scenes[s.id] = { type: "equirectangular", title: "", panorama: lite ? s.imageLite : s.image, yaw: s.yaw, pitch: s.pitch,
+      hotSpots: s.hotspots.map(function (h) {
+        return { pitch: h.pitch, yaw: h.yaw, cssClass: "hs-wrap", createTooltipFunc: tooltip, createTooltipArgs: h, clickHandlerFunc: function (e, hh) { activate(hh, nodes[hh.id]); }, clickHandlerArgs: h };
+      }) };
+  });
+  try {
+    viewer = pannellum.viewer("pano", cfg);
+    current = cfg.default.firstScene;
+    viewer.on("load", function () { document.getElementById("loader").classList.add("hide"); });
+    viewer.on("scenechange", function (id) { current = id; panel.classList.remove("open"); refresh(); I.report("vr", { mode: "vr", event: "scene", scene: id }); });
+    viewer.on("error", function (m) {
+      var l = document.getElementById("loader"); l.classList.remove("hide");
+      l.innerHTML = '<p><strong>The 360° scene could not be displayed on this device.</strong></p><p><a class="btn" href="../alt/vr.html">Open the static version</a></p>';
+    });
+    window.__ieltViewer = viewer;
+  } catch (e) {
+    document.getElementById("loader").innerHTML = '<p><strong>The 360° viewer is not supported by this browser.</strong></p><p><a class="btn" href="../alt/vr.html">Open the static version</a></p>';
+  }
+  refresh();
+})();
+</script>
+</body>
+</html>
