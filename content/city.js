@@ -13,6 +13,10 @@
  *   decide   communicative problem that needs a decision (learner view)
  *   lens     "teacher lens": a prompt about pedagogical affordances (teacher view)
  *   go       scene transition
+ *
+ * Audio: every clip has two files. `file` carries scene-appropriate sound design (station loudspeaker,
+ * telephone line, gallery reverberation); `clean` is the same voice with no effects, offered as an
+ * accessibility option next to every player. `fx` describes the sound design in words.
  */
 window.CITY = {
   version: "1.0.0",
@@ -20,30 +24,30 @@ window.CITY = {
   disclaimer: "Lindenbrück, its services and its museum collection are fictional and were created for this workshop. Scenes, photographs and the 3D object are AI-generated; voices are synthetic.",
   audioBase: "../assets/audio/",
   audio: {
-    "vrA_dialogue": { file: "vrA_dialogue.mp3", title: "At the information desk", speakers: "Visitor (Will voice), Information officer (Alice voice)", cefr: "B1",
+    "vrA_dialogue": { file: "vrA_dialogue.mp3", clean: "vrA_dialogue_clean.mp3", fx: "Four turns joined with 0.45 s pauses; faint interior room tone.", title: "At the information desk", speakers: "Visitor (Will voice), Information officer (Alice voice)", cefr: "B1",
       transcript: [
         ["Visitor", "Hi, sorry to bother you. My friend and I are only here until this evening. She loves history, but honestly, I just want good food and somewhere to sit down. What would you recommend?"],
         ["Officer", "No problem at all! Well, the Market Hall is perfect for food, but it closes at two o'clock, so I'd go there first. After that, the Museum of Culture is only two tram stops away, and it's open until six. Your friend will love the Festivals of Light exhibition."],
         ["Visitor", "That sounds great. And what about the Clock Tower? Is it far from here?"],
         ["Officer", "Not at all, it's a five-minute walk, just across the Old Bridge. But there are a hundred and forty-two steps and no lift, so maybe enjoy the view from the bridge instead. Here's a map. Have a lovely afternoon!"]
       ] },
-    "vrB_announcement_delay": { file: "vrB_announcement_delay.mp3", title: "Platform change announcement", speakers: "Station announcer (Daniel voice)", cefr: "B1",
+    "vrB_announcement_delay": { file: "vrB_announcement_delay.mp3", clean: "vrB_announcement_delay_clean.mp3", fx: "Three-note chime, loudspeaker band-limiting, concourse echo and low station ambience.", title: "Platform change announcement", speakers: "Station announcer (Daniel voice)", cefr: "B1",
       transcript: [["Announcer", "Attention, please. This is a platform change announcement. The eleven-oh-two Intercity service to Hamburg is delayed by approximately thirty-five minutes. This train will now depart from platform two, not platform one. We apologise for the inconvenience."]] },
-    "vrB_announcement_cancel": { file: "vrB_announcement_cancel.mp3", title: "Cancellation announcement", speakers: "Station announcer (Daniel voice)", cefr: "B1",
+    "vrB_announcement_cancel": { file: "vrB_announcement_cancel.mp3", clean: "vrB_announcement_cancel_clean.mp3", fx: "Three-note chime, loudspeaker band-limiting, concourse echo and low station ambience.", title: "Cancellation announcement", speakers: "Station announcer (Daniel voice)", cefr: "B1",
       transcript: [["Announcer", "Attention, please. The eleven forty-six service to Cologne has been cancelled today because of a technical problem. A replacement bus will leave from bus stop B, in front of the station, at twelve o'clock. Tickets for the cancelled train are valid on the bus."]] },
-    "vrB_clerk_options": { file: "vrB_clerk_options.mp3", title: "At the ticket office", speakers: "Ticket clerk (Eric voice)", cefr: "B1",
+    "vrB_clerk_options": { file: "vrB_clerk_options.mp3", clean: "vrB_clerk_options_clean.mp3", fx: "Voice through a ticket-window speaker; low station ambience.", title: "At the ticket office", speakers: "Ticket clerk (Eric voice)", cefr: "B1",
       transcript: [["Clerk", "Right, you've got two options. You can keep your ticket and wait for the delayed train. It leaves at eleven thirty-seven from platform two. Or you can take the next direct train at two minutes past twelve. There's no extra charge, but your seat reservation won't be valid on that one, so you might have to stand. What would you like to do?"]] },
-    "vrC_guide_painting": { file: "vrC_guide_painting.mp3", title: "The River of Lights", speakers: "Museum guide (Jessica voice)", cefr: "B1",
+    "vrC_guide_painting": { file: "vrC_guide_painting.mp3", clean: "vrC_guide_painting_clean.mp3", fx: "Light gallery reverberation and very quiet room tone.", title: "The River of Lights", speakers: "Museum guide (Jessica voice)", cefr: "B1",
       transcript: [["Guide", "This painting shows the River of Lights, the oldest festival in our collection. On the last evening of summer, families wrote one hope for the coming year on a paper lantern and placed it on the water. Look at the people on the left: they are not watching the lanterns, they are watching each other. For the artist, the festival was really about the community. Does your own culture have a celebration like this?"]] },
-    "vrC_guide_lanterns": { file: "vrC_guide_lanterns.mp3", title: "Why lanterns?", speakers: "Museum guide (Jessica voice)", cefr: "B1",
+    "vrC_guide_lanterns": { file: "vrC_guide_lanterns.mp3", clean: "vrC_guide_lanterns_clean.mp3", fx: "Light gallery reverberation and very quiet room tone.", title: "Why lanterns?", speakers: "Museum guide (Jessica voice)", cefr: "B1",
       transcript: [["Guide", "These paper lanterns were made by hand, and each family had its own pattern. The red ones were for good health, and the white ones were for remembering people who had died. They were never sold. You could only receive one as a gift. So here is my question for you: should a museum let visitors touch copies of objects like these? What do you think, and why?"]] },
-    "arA_tip": { file: "arA_tip.mp3", title: "Today's insider tip", speakers: "Information officer (Alice voice)", cefr: "B1",
+    "arA_tip": { file: "arA_tip.mp3", clean: "arA_tip_clean.mp3", fx: "Two-note app notification, then the voice unprocessed.", title: "Today's insider tip", speakers: "Information officer (Alice voice)", cefr: "B1",
       transcript: [["Officer", "Here's today's insider tip. The Clock Tower is closed for repairs, so the view from the Old Bridge is your best photo spot. The Market Hall closes at two, and the food tour at eleven is already full. But the Palm House is quiet today and open until six. If I were you, I'd change the order of your afternoon."]] },
-    "arB_update": { file: "arB_update.mp3", title: "Live service update", speakers: "Station announcer (Daniel voice)", cefr: "B1",
+    "arB_update": { file: "arB_update.mp3", clean: "arB_update_clean.mp3", fx: "Three-note chime and loudspeaker treatment, no ambience bed.", title: "Live service update", speakers: "Station announcer (Daniel voice)", cefr: "B1",
       transcript: [["Announcer", "Live update for Lindenbrück Central. The eleven-oh-two to Hamburg is delayed by thirty-five minutes and will leave from platform two. The eleven forty-six to Cologne is cancelled. A replacement bus leaves from stop B at twelve o'clock. All other services are running on time."]] },
-    "arC_curator": { file: "arC_curator.mp3", title: "The curator's note", speakers: "Museum guide (Jessica voice)", cefr: "B1",
+    "arC_curator": { file: "arC_curator.mp3", clean: "arC_curator_clean.mp3", fx: "Soft audio-guide tone, then the voice with light gallery reverberation.", title: "The curator's note", speakers: "Museum guide (Jessica voice)", cefr: "B1",
       transcript: [["Curator", "You are looking at the Storytelling Jar. Turn it slowly. The painter did not sign the jar. Instead, the story is the signature. Start at the river, follow the boats, and you will reach the lanterns. Every family in the town could find their own boat in the picture. If you had to explain this object to a friend in thirty seconds, what would you say first?"]] },
-    "elt_voicemail": { file: "elt_voicemail.mp3", title: "Voicemail: river cruise booking", speakers: "Cruise office (Chris voice)", cefr: "B1",
+    "elt_voicemail": { file: "elt_voicemail.mp3", clean: "elt_voicemail_clean.mp3", fx: "Answering-machine beep, telephone bandwidth (300 to 3400 Hz, 8 kHz resampling), faint line noise, end tones.", title: "Voicemail: river cruise booking", speakers: "Cruise office (Chris voice)", cefr: "B1",
       transcript: [["Caller", "Hello, this is a message for Sam from Lindenbrück River Cruises. I'm calling about your booking for two people this afternoon. Unfortunately, the two o'clock cruise is cancelled because of strong wind. We can move you to the four o'clock cruise, or give you a full refund. Please call us back before one o'clock and tell us which you prefer. Thank you, and sorry for the change."]] }
   },
 

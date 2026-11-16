@@ -34,6 +34,18 @@
       wrap.insertBefore(el("p", { class: "small", role: "status", text: "The audio file could not be loaded. Please use the transcript below." }), wrap.firstChild);
     });
     wrap.appendChild(player);
+    if (a.clean) {
+      var usingClean = false;
+      var sw = el("button", { type: "button", class: "btn secondary", style: "min-height:40px;padding:.3rem .9rem;font-size:.86rem;margin:.1rem 0 .4rem", "aria-pressed": "false", text: "Switch to the clear voice (no sound effects)" });
+      sw.addEventListener("click", function () {
+        usingClean = !usingClean; player.pause();
+        player.setAttribute("src", window.CITY.audioBase + (usingClean ? a.clean : a.file)); player.load();
+        sw.setAttribute("aria-pressed", usingClean ? "true" : "false");
+        sw.textContent = usingClean ? "Switch back to the version with sound effects" : "Switch to the clear voice (no sound effects)";
+      });
+      wrap.appendChild(sw);
+      if (a.fx) wrap.appendChild(el("p", { class: "small", text: "Sound design: " + a.fx }));
+    }
     var det = el("details", { class: "transcript" }, [el("summary", { text: "Show transcript" })]);
     a.transcript.forEach(function (line) { det.appendChild(el("p", null, [el("b", { text: line[0] + ": " }), line[1]])); });
     wrap.appendChild(det);
