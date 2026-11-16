@@ -150,12 +150,14 @@ window.CITY = {
      a scene opens only when the scenes before it are finished. requiredPerScene: null means every numbered
      step is required; set a number (for example 3) to require only the first steps of each scene if the
      6-minute slot proves too short in the pilot. */
-  /* requiredIds: null = every numbered step is required (17 steps). To shorten the tour and still keep one learner
-     step and the Teacher lens in every scene, list the step ids that stay required, in order, for example
-     ["A1", "A4", "A5", "B2", "B3", "B6", "C1", "C4", "C6"]; the other points then become optional extras.
-     requiredPerScene: a number n makes the first n steps of each scene required (this drops the Teacher lens steps,
-     so prefer requiredIds). Decide the list with the timed pilot (Research_Design_Protocol.md, section 12). */
-  vrCompletion: { sequential: true, requiredPerScene: null, requiredIds: null },
+  /* Required steps of the guided tour (author's decision of 16 November 2026, after the final review showed that
+     17 required steps do not fit the slot): nine steps, three in each scene, numbered 1, 2, 3 and done in order.
+     Each scene keeps a listening step, a second learner step and the Teacher lens. The other eight points are
+     optional extras (marked +): they open in place once the required step before them is done and are not needed
+     for the checkpoint word. requiredIds: null would make all 17 points required again. requiredPerScene: a number n
+     makes the first n points of each scene required (this drops the Teacher lens steps, so prefer requiredIds).
+     The list is to be confirmed by the timed pilot (Research_Design_Protocol.md, section 12). */
+  vrCompletion: { sequential: true, requiredPerScene: null, requiredIds: ["A1", "A4", "A5", "B2", "B3", "B6", "C1", "C4", "C6"] },
 
   /* ---------------------------------------------------------------- AR */
   /* Target plane: width 1, height 0.625 (1600 x 1000 px). u, v are fractions of the target image from its top-left corner. */

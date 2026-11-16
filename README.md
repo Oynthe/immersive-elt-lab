@@ -9,7 +9,7 @@ Static site for the workshop **Designing Immersive ELT Tasks: From VR and AR to 
 - `content/city.js` Single content source for scenes, hotspots, overlays and transcripts.
 - `config.js` Checkpoint words and the optional portal URL.
 - Reference view: `vr/index.html?free=1&scene=<visitor-centre|central-station|museum>` opens a scene with every point open, no lock and no checkpoint word. It reports nothing and does not count as the tour.
-- Tour length: `content/city.js`, `vrCompletion.requiredIds` lists the steps that stay required and in order; other points become optional extras.
+- Tour length: nine required steps, three in each scene, numbered 1 to 3 and done in order (`content/city.js`, `vrCompletion.requiredIds`); the other eight points are optional extras marked +.
 
 Lindenbrück, its services and its museum collection are fictional. Panoramas, photographs and the 3D object are AI-generated; voices are synthetic. The site sets no cookies, collects no personal data, and processes the camera image on the device only.
 

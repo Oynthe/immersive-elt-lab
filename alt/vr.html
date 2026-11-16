@@ -51,7 +51,7 @@
     if (FREE) { done.appendChild(el("p", { class: "notice", role: "status", text: "Reference view: every point is open. This view does not count as the tour and shows no checkpoint word." })); return; }
     var ok = C.scenes.every(function (s) { return sceneDone(s.id); });
     I.report("vr", { mode: "vr-alt", opened: Object.keys(opened), total: dn, required: total, complete: ok });
-    done.appendChild(ok ? I.checkpointBox(I.config.checkpoints.vrAlt, "Virtual City (static version)") : el("p", { class: "notice", role: "status", text: "Follow the numbered steps in order, scene by scene (" + dn + " of " + total + " done). Your checkpoint word appears after the last step." }));
+    done.appendChild(ok ? I.checkpointBox(I.config.checkpoints.vrAlt, "Virtual City (static version)") : el("p", { class: "notice", role: "status", text: "Follow the numbered steps in order, scene by scene (" + dn + " of " + total + " done). Points marked Extra are optional. Your checkpoint word appears after the last numbered step." }));
   }
   main.appendChild(msg);
   C.scenes.forEach(function (s, si) {

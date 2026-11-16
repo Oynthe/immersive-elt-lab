@@ -66,7 +66,7 @@
   <header class="topbar" id="bar">
     <div>
       <h1>The Virtual City Experience</h1>
-      <div class="sub">Lindenbrück · drag to look around · follow the numbered steps in order: 1, 2, 3…</div>
+      <div class="sub">Lindenbrück · drag to look around · follow the numbered steps in order: 1, 2, 3 · points marked + are optional extras</div>
     </div>
     <nav class="tabs" id="tabs" aria-label="Scenes"></nav>
   </header>
@@ -198,7 +198,12 @@
     // guide the participant to what comes next
     var nx = nextStep(current), target = nx;
     if (!nx) { var sc = CITY.scenes[sceneIndex(current)]; target = sc.hotspots.filter(function (h) { return h.type === "go" && sceneIndex(h.to) > sceneIndex(current); })[0] || null; }
-    if (target && viewer) { viewer.lookAt(target.pitch, target.yaw, viewer.getHfov(), calm ? 0 : 900); if (nodes[target.id]) nodes[target.id].focus({ preventScroll: true }); }
+    if (target && viewer) {
+      viewer.lookAt(target.pitch, target.yaw, viewer.getHfov(), calm ? 0 : 900);
+      /* the next step can be outside the current view, where the viewer hides it; move the focus once the view has turned */
+      var tn = nodes[target.id];
+      if (tn) setTimeout(function () { if (!panel.classList.contains("open")) tn.focus({ preventScroll: true }); }, calm ? 80 : 1000);
+    }
     else if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && panel.classList.contains("open")) closePanel(); });
@@ -232,7 +237,7 @@
     if (sc) {
       guide.appendChild(el("h2", { text: sc.title }));
       guide.appendChild(el("p", { text: sc.summary }));
-      guide.appendChild(el("p", { text: FREE ? "Reference view: every point is open. This view does not count as the tour." : "Do the steps in order. A step opens when the one before it is done." }));
+      guide.appendChild(el("p", { text: FREE ? "Reference view: every point is open. This view does not count as the tour." : "Do the numbered steps in order. A step opens when the one before it is done. Points marked + are optional extras." }));
       sc.hotspots.forEach(function (h) {
         var locked = h.type === "go" ? !sceneUnlocked(h.to) : !stepUnlocked(h), isCur = !FREE && !locked && !opened[h.id] && h.type !== "go" && !h.extra;
         guide.appendChild(el("button", { type: "button", "aria-disabled": locked ? "true" : "false", onclick: function () {
