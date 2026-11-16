@@ -22,8 +22,18 @@
   .hs svg{width:24px;height:24px;pointer-events:none}
   .hs.hs-listen{background:#1f7a6d}.hs.hs-look{background:#2b6cb0}.hs.hs-language{background:#7b4fb3}.hs.hs-decide{background:#c2452d}.hs.hs-lens{background:#17233c;border-color:var(--amber)}.hs.hs-go{background:#5b6b88}
   .hs.done{box-shadow:0 0 0 4px #7bd88f, 0 2px 10px #0008}
-  .hs:after{content:"";position:absolute;inset:-9px;border-radius:50%;border:2px solid #fff9;animation:pulse 2.2s ease-out infinite}
-  .hs.done:after{display:none}
+  .hs.current:after{content:"";position:absolute;inset:-9px;border-radius:50%;border:3px solid var(--amber);animation:pulse 1.8s ease-out infinite}
+  .hs.locked{background:#3a4358 !important;border-color:#aab3c5;color:#cfd6e4;opacity:.92}
+  .hs .num{position:absolute;top:-10px;right:-10px;min-width:24px;height:24px;border-radius:12px;background:#fff;color:var(--navy);font-size:.82rem;font-weight:900;line-height:24px;text-align:center;box-shadow:0 1px 4px #0008;padding:0 4px}
+  .hs.current .num{background:var(--amber)}
+  .hs.done .num{background:#7bd88f}
+  #toast{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);z-index:26;max-width:min(560px,calc(100% - 24px));background:var(--amber);color:var(--navy);font-weight:800;border-radius:12px;padding:.6rem 1rem;box-shadow:0 4px 18px #0007;display:none;text-align:center}
+  #toast.show{display:block}
+  .tabs button[aria-disabled="true"]{opacity:.55}
+  #guide button[aria-disabled="true"]{opacity:.55}
+  #guide .n{flex:0 0 26px;height:26px;border-radius:13px;background:#fff;color:var(--navy);font-weight:900;font-size:.82rem;line-height:26px;text-align:center}
+  #guide .n.cur{background:var(--amber)}
+  #guide .n.ok{background:#7bd88f}
   .hs span.tip{position:absolute;bottom:56px;left:50%;transform:translateX(-50%);background:#0c1322ee;color:#fff;font-size:.82rem;font-weight:700;padding:.3rem .6rem;border-radius:6px;white-space:nowrap;visibility:hidden}
   .hs:hover span.tip,.hs:focus-visible span.tip{visibility:visible}
   @keyframes pulse{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.5);opacity:0}}
@@ -54,7 +64,7 @@
   <header class="topbar" id="bar">
     <div>
       <h1>The Virtual City Experience</h1>
-      <div class="sub">Lindenbrück · drag to look around · open at least one point in every scene</div>
+      <div class="sub">Lindenbrück · drag to look around · follow the numbered steps in order: 1, 2, 3…</div>
     </div>
     <nav class="tabs" id="tabs" aria-label="Scenes"></nav>
   </header>
@@ -65,6 +75,7 @@
     <button class="btn" id="guideBtn" aria-expanded="false" aria-controls="guide">Guide</button>
     <nav id="guide" aria-label="Points in this scene"></nav>
     <div id="status" role="status" aria-live="polite"></div>
+    <div id="toast" role="alert"></div>
     <aside id="panel" aria-label="Point details" aria-live="polite"></aside>
   </main>
 </div>
@@ -94,72 +105,130 @@
   } catch (e) {}
 
   var opened = I.store("ielt_vr_opened") || {};   // hotspotId -> true
-  var byId = {}, sceneOf = {}, nodes = {};
-  CITY.scenes.forEach(function (s) { s.hotspots.forEach(function (h) { byId[h.id] = h; sceneOf[h.id] = s.id; }); });
-  var panel = document.getElementById("panel"), guide = document.getElementById("guide"), guideBtn = document.getElementById("guideBtn");
-  var lastFocus = null, viewer = null, current = null, announcedDone = false;
+  var byId = {}, sceneOf = {}, nodes = {}, sceneSteps = {};
+  CITY.scenes.forEach(function (s) {
+    var k = 0; sceneSteps[s.id] = [];
+    s.hotspots.forEach(function (h) { byId[h.id] = h; sceneOf[h.id] = s.id; if (h.type !== "go") { k++; h.step = k; sceneSteps[s.id].push(h.id); } });
+  });
+  var REQ = (CITY.vrCompletion && CITY.vrCompletion.requiredPerScene) || null;   // null = every numbered step
+  var panel = document.getElementById("panel"), guide = document.getElementById("guide"), guideBtn = document.getElementById("guideBtn"), toastEl = document.getElementById("toast");
+  var lastFocus = null, viewer = null, current = null, announcedDone = false, toastTimer = null;
+  var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---- sequence rules: steps are done in order inside a scene; a scene opens when the scenes before it are finished */
+  function sceneIndex(sid) { for (var i = 0; i < CITY.scenes.length; i++) if (CITY.scenes[i].id === sid) return i; return -1; }
+  function requiredIds(sid) { var a = sceneSteps[sid]; return REQ ? a.slice(0, REQ) : a; }
+  function sceneDone(sid) { return requiredIds(sid).every(function (id) { return opened[id]; }); }
+  function sceneUnlocked(sid) { var i = sceneIndex(sid); for (var j = 0; j < i; j++) if (!sceneDone(CITY.scenes[j].id)) return false; return true; }
+  function nextStep(sid) { var a = sceneSteps[sid]; for (var j = 0; j < a.length; j++) if (!opened[a[j]]) return byId[a[j]]; return null; }
+  function stepUnlocked(h) {
+    var sid = sceneOf[h.id]; if (!sceneUnlocked(sid)) return false;
+    var a = sceneSteps[sid], idx = a.indexOf(h.id);
+    for (var j = 0; j < idx; j++) if (!opened[a[j]]) return false;
+    return true;
+  }
+  function toast(msg) {
+    toastEl.textContent = msg; toastEl.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 4200);
+  }
+  function lockedMessage(sid) {
+    for (var j = 0; j < CITY.scenes.length; j++) {
+      var s = CITY.scenes[j];
+      if (!sceneDone(s.id)) { var n = nextStep(s.id); return "Scene " + s.letter + " (" + s.short + ") comes first. Next there: step " + n.step + ", " + n.title + "."; }
+      if (s.id === sid) break;
+    }
+    return "";
+  }
 
   function tooltip(div, h) {
     div.classList.add("hs", "hs-" + h.type);
-    if (opened[h.id]) div.classList.add("done");
     div.setAttribute("role", "button"); div.setAttribute("tabindex", "0");
-    div.setAttribute("aria-label", I.TYPE_LABEL[h.type] + ": " + h.title);
-    div.innerHTML = ICON[h.type] + '<span class="tip"></span>';
-    div.querySelector(".tip").textContent = h.title;
+    div.innerHTML = ICON[h.type] + (h.step ? '<span class="num"></span>' : "") + '<span class="tip"></span>';
+    if (h.step) div.querySelector(".num").textContent = String(h.step);
+    div.querySelector(".tip").textContent = (h.step ? h.step + ". " : "") + h.title;
     div.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(h, div); } });
-    nodes[h.id] = div;
+    nodes[h.id] = div; paintOne(h);
+  }
+  function paintOne(h) {
+    var n = nodes[h.id]; if (!n) return;
+    var locked = h.type === "go" ? !sceneUnlocked(h.to) : !stepUnlocked(h);
+    var cur = h.type === "go" ? (!locked && sceneDone(sceneOf[h.id]) && sceneIndex(h.to) > sceneIndex(sceneOf[h.id])) : (!locked && !opened[h.id]);
+    n.classList.toggle("locked", locked); n.classList.toggle("done", !!opened[h.id]); n.classList.toggle("current", cur);
+    n.setAttribute("aria-disabled", locked ? "true" : "false");
+    n.setAttribute("aria-label", (h.step ? "Step " + h.step + ", " : "") + I.TYPE_LABEL[h.type] + ": " + h.title + (locked ? " (locked: finish the earlier steps first)" : opened[h.id] ? " (done)" : ""));
   }
   function activate(h, node) {
-    if (h.type === "go") { viewer.loadScene(h.to); return; }
+    if (h.type === "go") {
+      if (!sceneUnlocked(h.to)) { var n0 = nextStep(sceneOf[h.id]); toast(n0 ? "Finish this scene first. Next: step " + n0.step + ", " + n0.title + "." : lockedMessage(h.to)); return; }
+      viewer.loadScene(h.to); return;
+    }
+    if (!stepUnlocked(h)) { var nx = nextStep(sceneOf[h.id]); toast("This is step " + h.step + ". Do step " + nx.step + " first: " + nx.title + "."); return; }
     lastFocus = node || nodes[h.id] || guideBtn;
     opened[h.id] = true; I.store("ielt_vr_opened", opened);
-    if (nodes[h.id]) nodes[h.id].classList.add("done");
     var d = I.detail(h);
     panel.innerHTML = "";
     var close = el("button", { class: "close", "aria-label": "Close details", text: "×", onclick: closePanel });
-    panel.appendChild(close); panel.appendChild(d.node);
+    panel.appendChild(close);
+    panel.appendChild(el("p", { class: "small", style: "margin:0 0 .3rem;font-weight:800", text: "Step " + h.step + " of " + sceneSteps[sceneOf[h.id]].length + " in this scene" }));
+    panel.appendChild(d.node);
+    panel.appendChild(el("p", null, [el("button", { class: "btn dark", type: "button", text: "Done: go to the next step", onclick: closePanel })]));
     panel.classList.add("open"); d.heading.focus();
     refresh();
   }
   function closePanel() {
     var a = panel.querySelector("audio"); if (a) a.pause();
+    var was = panel.classList.contains("open");
     panel.classList.remove("open");
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
+    if (!was) return;
+    // guide the participant to what comes next
+    var nx = nextStep(current), target = nx;
+    if (!nx) { var sc = CITY.scenes[sceneIndex(current)]; target = sc.hotspots.filter(function (h) { return h.type === "go" && sceneIndex(h.to) > sceneIndex(current); })[0] || null; }
+    if (target && viewer) { viewer.lookAt(target.pitch, target.yaw, viewer.getHfov(), calm ? 0 : 900); if (nodes[target.id]) nodes[target.id].focus({ preventScroll: true }); }
+    else if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && panel.classList.contains("open")) closePanel(); });
 
   function progress() {
-    var total = 0, scenes = {};
-    Object.keys(opened).forEach(function (id) { if (byId[id] && byId[id].type !== "go") { total++; scenes[sceneOf[id]] = true; } });
-    var n = Object.keys(scenes).length, c = CITY.vrCompletion;
-    return { total: total, scenes: n, complete: n >= c.minScenes && total >= c.minHotspots, sceneIds: Object.keys(scenes) };
+    var done = 0, total = 0, scenes = [];
+    CITY.scenes.forEach(function (s) {
+      var req = requiredIds(s.id); total += req.length;
+      req.forEach(function (id) { if (opened[id]) done++; });
+      if (sceneDone(s.id)) scenes.push(s.id);
+    });
+    return { done: done, total: total, scenesDone: scenes, complete: scenes.length === CITY.scenes.length };
   }
   function refresh() {
-    var p = progress(), c = CITY.vrCompletion;
-    document.getElementById("status").textContent = p.complete ? "Tour complete" : ("Scenes " + p.scenes + "/" + c.minScenes + " · points " + p.total + "/" + c.minHotspots);
+    var p = progress();
+    document.getElementById("status").textContent = p.complete ? "Tour complete" : ("Step " + Math.min(p.done + 1, p.total) + " of " + p.total);
+    Object.keys(byId).forEach(function (id) { paintOne(byId[id]); });
     // tabs
     var tabs = document.getElementById("tabs"); tabs.innerHTML = "";
     CITY.scenes.forEach(function (s) {
-      var done = s.hotspots.filter(function (h) { return h.type !== "go" && opened[h.id]; }).length;
-      var all = s.hotspots.filter(function (h) { return h.type !== "go"; }).length;
-      var b = el("button", { type: "button", "aria-current": s.id === current ? "true" : "false", onclick: function () { if (s.id !== current) viewer.loadScene(s.id); } },
-        [s.letter + " · " + s.short, el("span", { class: "count", text: done + "/" + all })]);
+      var all = sceneSteps[s.id].length, dn = sceneSteps[s.id].filter(function (id) { return opened[id]; }).length, un = sceneUnlocked(s.id);
+      var b = el("button", { type: "button", "aria-current": s.id === current ? "true" : "false", "aria-disabled": un ? "false" : "true",
+        "aria-label": "Scene " + s.letter + ", " + s.short + ", " + dn + " of " + all + " steps done" + (un ? "" : ", locked"),
+        onclick: function () { if (!sceneUnlocked(s.id)) { toast(lockedMessage(s.id)); return; } if (s.id !== current) viewer.loadScene(s.id); } },
+        [(un ? "" : "🔒 ") + s.letter + " · " + s.short, el("span", { class: "count", text: dn + "/" + all })]);
       tabs.appendChild(b);
     });
     // guide list
-    var sc = CITY.scenes.filter(function (s) { return s.id === current; })[0];
+    var sc = CITY.scenes[sceneIndex(current)];
     guide.innerHTML = "";
     if (sc) {
       guide.appendChild(el("h2", { text: sc.title }));
       guide.appendChild(el("p", { text: sc.summary }));
+      guide.appendChild(el("p", { text: "Do the steps in order. A step opens when the one before it is done." }));
       sc.hotspots.forEach(function (h) {
-        guide.appendChild(el("button", { type: "button", onclick: function () {
-          if (h.type !== "go") viewer.lookAt(h.pitch, h.yaw, viewer.getHfov(), 700);
+        var locked = h.type === "go" ? !sceneUnlocked(h.to) : !stepUnlocked(h), isCur = !locked && !opened[h.id] && h.type !== "go";
+        guide.appendChild(el("button", { type: "button", "aria-disabled": locked ? "true" : "false", onclick: function () {
+          if (!locked && h.type !== "go") viewer.lookAt(h.pitch, h.yaw, viewer.getHfov(), calm ? 0 : 700);
           activate(h, guideBtn);
-        } }, [el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title }), opened[h.id] ? el("span", { class: "tick", "aria-label": "opened", text: "✓" }) : null]));
+        } }, [el("span", { class: "n" + (opened[h.id] ? " ok" : isCur ? " cur" : ""), text: h.step ? String(h.step) : "→" }),
+              el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title }),
+              opened[h.id] ? el("span", { class: "tick", "aria-label": "done", text: "✓" }) : (locked ? el("span", { class: "tick", style: "color:#cfd6e4", "aria-label": "locked", text: "🔒" }) : null)]));
       });
     }
-    I.report("vr", { mode: "vr", opened: Object.keys(opened), scenes: p.sceneIds, total: p.total, complete: p.complete });
+    I.report("vr", { mode: "vr", opened: Object.keys(opened), scenes: p.scenesDone, total: p.done, required: p.total, complete: p.complete });
     if (p.complete && !announcedDone) {
       announcedDone = true;
       var box = document.getElementById("done"); box.innerHTML = "";
@@ -173,7 +242,10 @@
     var o = guide.classList.toggle("open"); guideBtn.setAttribute("aria-expanded", o ? "true" : "false");
   });
 
-  var cfg = { default: { firstScene: CITY.scenes[0].id, sceneFadeDuration: 700, autoLoad: true, showControls: true, keyboardZoom: true, mouseZoom: true, hfov: 100, minHfov: 50, maxHfov: 110, minPitch: -78, maxPitch: 78, strings: { loadingLabel: "Loading the scene…" } }, scenes: {} };
+  // resume at the first scene that is not finished
+  var first = CITY.scenes[0].id;
+  for (var q = 0; q < CITY.scenes.length; q++) { first = CITY.scenes[q].id; if (!sceneDone(first)) break; }
+  var cfg = { default: { firstScene: first, sceneFadeDuration: 700, autoLoad: true, showControls: true, keyboardZoom: true, mouseZoom: true, hfov: 100, minHfov: 50, maxHfov: 110, minPitch: -78, maxPitch: 78, strings: { loadingLabel: "Loading the scene…" } }, scenes: {} };
   CITY.scenes.forEach(function (s) {
     cfg.scenes[s.id] = { type: "equirectangular", title: "", panorama: lite ? s.imageLite : s.image, yaw: s.yaw, pitch: s.pitch,
       hotSpots: s.hotspots.map(function (h) {
@@ -183,13 +255,13 @@
   try {
     viewer = pannellum.viewer("pano", cfg);
     current = cfg.default.firstScene;
-    viewer.on("load", function () { document.getElementById("loader").classList.add("hide"); });
+    viewer.on("load", function () { document.getElementById("loader").classList.add("hide"); refresh(); });
     viewer.on("scenechange", function (id) { current = id; panel.classList.remove("open"); refresh(); I.report("vr", { mode: "vr", event: "scene", scene: id }); });
     viewer.on("error", function (m) {
       var l = document.getElementById("loader"); l.classList.remove("hide");
       l.innerHTML = '<p><strong>The 360° scene could not be displayed on this device.</strong></p><p><a class="btn" href="../alt/vr.html">Open the static version</a></p>';
     });
-    window.__ieltViewer = viewer;
+    window.__ieltViewer = viewer; window.__ieltVr = { activate: activate, byId: byId, opened: opened, stepUnlocked: stepUnlocked, sceneUnlocked: sceneUnlocked };
   } catch (e) {
     document.getElementById("loader").innerHTML = '<p><strong>The 360° viewer is not supported by this browser.</strong></p><p><a class="btn" href="../alt/vr.html">Open the static version</a></p>';
   }

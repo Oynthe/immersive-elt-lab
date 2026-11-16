@@ -146,7 +146,11 @@ window.CITY = {
         { id: "C7", type: "go", yaw: 163, pitch: -4, title: "Leave the museum: back to the Visitor Centre", to: "visitor-centre" }
       ] }
   ],
-  vrCompletion: { minScenes: 3, minHotspots: 4 },
+  /* Guided order: inside a scene the numbered steps (every hotspot except "go") are done in order 1, 2, 3...;
+     a scene opens only when the scenes before it are finished. requiredPerScene: null means every numbered
+     step is required; set a number (for example 3) to require only the first steps of each scene if the
+     6-minute slot proves too short in the pilot. */
+  vrCompletion: { sequential: true, requiredPerScene: null },
 
   /* ---------------------------------------------------------------- AR */
   /* Target plane: width 1, height 0.625 (1600 x 1000 px). u, v are fractions of the target image from its top-left corner. */

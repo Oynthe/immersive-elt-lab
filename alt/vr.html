@@ -18,29 +18,56 @@
 (function () {
   var I = window.IELT, el = I.el, C = window.CITY, main = document.getElementById("main");
   document.getElementById("disc").textContent = C.disclaimer;
-  var opened = I.store("ielt_vralt_opened") || {}, done = el("div", { id: "done" });
-  function check() {
-    var scenes = {}, total = 0;
-    C.scenes.forEach(function (s) { s.hotspots.forEach(function (h) { if (opened[h.id]) { scenes[s.id] = 1; total++; } }); });
-    var ok = Object.keys(scenes).length >= C.vrCompletion.minScenes && total >= C.vrCompletion.minHotspots;
-    I.report("vr", { mode: "vr-alt", opened: Object.keys(opened), scenes: Object.keys(scenes), total: total, complete: ok });
+  var opened = I.store("ielt_vralt_opened") || {}, done = el("div", { id: "done" }), msg = el("p", { class: "notice", role: "alert", style: "display:none;position:sticky;top:8px;z-index:5" });
+  var REQ = (C.vrCompletion && C.vrCompletion.requiredPerScene) || null, steps = {}, rows = {};
+  C.scenes.forEach(function (s) { steps[s.id] = s.hotspots.filter(function (h) { return h.type !== "go"; }); });
+  function req(sid) { return REQ ? steps[sid].slice(0, REQ) : steps[sid]; }
+  function sceneDone(sid) { return req(sid).every(function (h) { return opened[h.id]; }); }
+  function sceneUnlocked(i) { for (var j = 0; j < i; j++) if (!sceneDone(C.scenes[j].id)) return false; return true; }
+  function unlocked(si, k) { if (!sceneUnlocked(si)) return false; var a = steps[C.scenes[si].id]; for (var j = 0; j < k; j++) if (!opened[a[j].id]) return false; return true; }
+  function say(t) { msg.textContent = t; msg.style.display = t ? "block" : "none"; }
+  function paint() {
+    var total = 0, dn = 0;
+    C.scenes.forEach(function (s, si) {
+      req(s.id).forEach(function (h) { total++; if (opened[h.id]) dn++; });
+      steps[s.id].forEach(function (h, k) {
+        var r = rows[h.id], lock = !unlocked(si, k);
+        r.state.textContent = opened[h.id] ? "done" : lock ? "locked" : "next";
+        r.sum.setAttribute("aria-disabled", lock ? "true" : "false"); r.det.style.opacity = lock ? ".55" : "1";
+      });
+    });
+    var ok = C.scenes.every(function (s) { return sceneDone(s.id); });
+    I.report("vr", { mode: "vr-alt", opened: Object.keys(opened), total: dn, required: total, complete: ok });
     done.innerHTML = "";
-    done.appendChild(ok ? I.checkpointBox(I.config.checkpoints.vrAlt, "Virtual City (static version)") : el("p", { class: "notice", role: "status", text: "Open at least one point in each of the three scenes and four points in total (" + total + " opened so far) to receive your checkpoint word." }));
+    done.appendChild(ok ? I.checkpointBox(I.config.checkpoints.vrAlt, "Virtual City (static version)") : el("p", { class: "notice", role: "status", text: "Follow the numbered steps in order, scene by scene (" + dn + " of " + total + " done). Your checkpoint word appears after the last step." }));
   }
-  C.scenes.forEach(function (s) {
+  main.appendChild(msg);
+  C.scenes.forEach(function (s, si) {
     var sec = el("section", { class: "card", "aria-labelledby": "h-" + s.id }, [el("h2", { id: "h-" + s.id, text: "Scene " + s.letter + ": " + s.title }), el("p", { text: s.summary })]);
     var v = el("div", { class: "views" });
     s.views.forEach(function (w) { v.appendChild(el("figure", null, [el("img", { src: w.file, alt: w.alt, loading: "lazy" }), el("figcaption", { text: w.alt })])); });
     sec.appendChild(v);
-    s.hotspots.filter(function (h) { return h.type !== "go"; }).forEach(function (h) {
-      var d = el("details", { class: "pt" }, [el("summary", null, [el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title })])]);
+    steps[s.id].forEach(function (h, k) {
+      var state = el("span", { class: "small", style: "margin-left:auto;font-weight:800" });
+      var sum = el("summary", null, [el("span", { class: "badge", style: "background:#17233c", text: "Step " + (k + 1) }), el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title }), state]);
+      var d = el("details", { class: "pt" }, [sum]);
       d.appendChild(I.detail(h).node);
-      d.addEventListener("toggle", function () { if (d.open) { opened[h.id] = true; I.store("ielt_vralt_opened", opened); check(); } });
+      rows[h.id] = { det: d, sum: sum, state: state };
+      d.addEventListener("toggle", function () {
+        if (!d.open) return;
+        if (!unlocked(si, k)) {
+          d.open = false;
+          var first = null;
+          for (var a = 0; a < C.scenes.length && !first; a++) for (var b = 0; b < steps[C.scenes[a].id].length; b++) { var x = steps[C.scenes[a].id][b]; if (!opened[x.id]) { first = "Scene " + C.scenes[a].letter + ", step " + (b + 1) + ": " + x.title; break; } }
+          say("That step is still locked. Do this one first: " + first + "."); return;
+        }
+        say(""); opened[h.id] = true; I.store("ielt_vralt_opened", opened); paint();
+      });
       sec.appendChild(d);
     });
     main.appendChild(sec);
   });
-  main.appendChild(done); check();
+  main.appendChild(done); paint();
 })();
 </script>
 </body>
