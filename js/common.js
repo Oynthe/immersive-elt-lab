@@ -49,7 +49,7 @@
     var det = el("details", { class: "transcript" }, [el("summary", { text: "Show transcript" })]);
     a.transcript.forEach(function (line) { det.appendChild(el("p", null, [el("b", { text: line[0] + ": " }), line[1]])); });
     wrap.appendChild(det);
-    wrap.appendChild(el("p", { class: "small", text: a.speakers + " · about CEFR " + a.cefr + " · synthetic voice" }));
+    wrap.appendChild(el("p", { class: "small", text: a.speakers + " · script written at about CEFR " + a.cefr + " · synthetic voice" }));
     return wrap;
   }
 
@@ -93,6 +93,25 @@
     try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, "*"); } catch (e) {}
   }
 
+  /* Which steps of the Virtual City tour are required, shared by the 360° viewer and the static version.
+     vrCompletion.requiredIds   a list of step ids: those steps are required, numbered 1, 2, 3… and done in order;
+                                every other point of the scene becomes an optional extra;
+     vrCompletion.requiredPerScene   a number n: the first n steps of each scene are required;
+     neither                    every step is required (the default).
+     Sets step (1, 2, 3…) or extra (true) on each hotspot and returns { sceneId: { required: [...], extras: [...] } }. */
+  function vrPlan(city) {
+    var vc = city.vrCompletion || {}, ids = vc.requiredIds && vc.requiredIds.length ? vc.requiredIds : null, n = vc.requiredPerScene || null, plan = {};
+    city.scenes.forEach(function (s) {
+      var content = s.hotspots.filter(function (h) { return h.type !== "go"; });
+      var req = ids ? content.filter(function (h) { return ids.indexOf(h.id) >= 0; }) : (n ? content.slice(0, n) : content);
+      if (!req.length) req = content;   /* a scene always keeps at least one required step */
+      var k = 0, extras = [];
+      content.forEach(function (h) { delete h.step; delete h.extra; if (req.indexOf(h) >= 0) { k++; h.step = k; } else { h.extra = true; extras.push(h); } });
+      plan[s.id] = { required: req, extras: extras };
+    });
+    return plan;
+  }
+
   function checkpointBox(word, what) {
     return el("div", { class: "checkpoint", role: "status" }, [
       el("strong", { text: what + " complete. " }),
@@ -102,5 +121,5 @@
     ]);
   }
 
-  window.IELT = { el: el, qs: qs, store: store, audioBlock: audioBlock, detail: detail, report: report, checkpointBox: checkpointBox, TYPE_LABEL: TYPE_LABEL, config: C };
+  window.IELT = { el: el, qs: qs, store: store, audioBlock: audioBlock, detail: detail, report: report, checkpointBox: checkpointBox, vrPlan: vrPlan, TYPE_LABEL: TYPE_LABEL, config: C };
 })();

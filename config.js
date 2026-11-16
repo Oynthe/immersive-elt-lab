@@ -9,5 +9,5 @@
 window.IELT_CONFIG = {
   checkpoints: { vr: "COMPASS", vrAlt: "ATLAS", ar: "LANTERN", arAlt: "BEACON" },
   portalUrl: "",
-  siteVersion: "1.0.0"
+  siteVersion: "1.1.0"
 };

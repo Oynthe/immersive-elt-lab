@@ -18,27 +18,39 @@
 (function () {
   var I = window.IELT, el = I.el, C = window.CITY, main = document.getElementById("main");
   document.getElementById("disc").textContent = C.disclaimer;
-  var opened = I.store("ielt_vralt_opened") || {}, done = el("div", { id: "done" }), msg = el("p", { class: "notice", role: "alert", style: "display:none;position:sticky;top:8px;z-index:5" });
-  var REQ = (C.vrCompletion && C.vrCompletion.requiredPerScene) || null, steps = {}, rows = {};
-  C.scenes.forEach(function (s) { steps[s.id] = s.hotspots.filter(function (h) { return h.type !== "go"; }); });
-  function req(sid) { return REQ ? steps[sid].slice(0, REQ) : steps[sid]; }
-  function sceneDone(sid) { return req(sid).every(function (h) { return opened[h.id]; }); }
-  function sceneUnlocked(i) { for (var j = 0; j < i; j++) if (!sceneDone(C.scenes[j].id)) return false; return true; }
-  function unlocked(si, k) { if (!sceneUnlocked(si)) return false; var a = steps[C.scenes[si].id]; for (var j = 0; j < k; j++) if (!opened[a[j].id]) return false; return true; }
+  var FREE = I.qs("free") === "1";   /* reference view: nothing locked, nothing stored or reported, no checkpoint word */
+  var opened = FREE ? {} : (I.store("ielt_vralt_opened") || {}), done = el("div", { id: "done" }), msg = el("p", { class: "notice", role: "alert", style: "display:none;position:sticky;top:8px;z-index:5" });
+  var plan = I.vrPlan(C), rows = {};   /* the same required steps and optional extras as the 360° viewer */
+  function content(s) { return s.hotspots.filter(function (h) { return h.type !== "go"; }); }
+  function sceneDone(sid) { return plan[sid].required.every(function (h) { return opened[h.id]; }); }
+  function sceneUnlocked(i) { if (FREE) return true; for (var j = 0; j < i; j++) if (!sceneDone(C.scenes[j].id)) return false; return true; }
+  /* a point opens when every required step before it in its scene is done */
+  function unlocked(si, h) {
+    if (FREE) return true;
+    if (!sceneUnlocked(si)) return false;
+    var a = content(C.scenes[si]);
+    for (var j = 0; j < a.length; j++) { if (a[j] === h) break; if (a[j].step && !opened[a[j].id]) return false; }
+    return true;
+  }
+  function firstOpenStep() {
+    for (var a = 0; a < C.scenes.length; a++) { var r = plan[C.scenes[a].id].required; for (var b = 0; b < r.length; b++) if (!opened[r[b].id]) return "Scene " + C.scenes[a].letter + ", step " + r[b].step + ": " + r[b].title; }
+    return "";
+  }
   function say(t) { msg.textContent = t; msg.style.display = t ? "block" : "none"; }
   function paint() {
     var total = 0, dn = 0;
     C.scenes.forEach(function (s, si) {
-      req(s.id).forEach(function (h) { total++; if (opened[h.id]) dn++; });
-      steps[s.id].forEach(function (h, k) {
-        var r = rows[h.id], lock = !unlocked(si, k);
-        r.state.textContent = opened[h.id] ? "done" : lock ? "locked" : "next";
+      plan[s.id].required.forEach(function (h) { total++; if (opened[h.id]) dn++; });
+      content(s).forEach(function (h) {
+        var r = rows[h.id], lock = !unlocked(si, h);
+        r.state.textContent = opened[h.id] ? (FREE ? "opened" : "done") : lock ? "locked" : FREE ? "" : h.extra ? "optional" : "next";
         r.sum.setAttribute("aria-disabled", lock ? "true" : "false"); r.det.style.opacity = lock ? ".55" : "1";
       });
     });
+    done.innerHTML = "";
+    if (FREE) { done.appendChild(el("p", { class: "notice", role: "status", text: "Reference view: every point is open. This view does not count as the tour and shows no checkpoint word." })); return; }
     var ok = C.scenes.every(function (s) { return sceneDone(s.id); });
     I.report("vr", { mode: "vr-alt", opened: Object.keys(opened), total: dn, required: total, complete: ok });
-    done.innerHTML = "";
     done.appendChild(ok ? I.checkpointBox(I.config.checkpoints.vrAlt, "Virtual City (static version)") : el("p", { class: "notice", role: "status", text: "Follow the numbered steps in order, scene by scene (" + dn + " of " + total + " done). Your checkpoint word appears after the last step." }));
   }
   main.appendChild(msg);
@@ -47,21 +59,16 @@
     var v = el("div", { class: "views" });
     s.views.forEach(function (w) { v.appendChild(el("figure", null, [el("img", { src: w.file, alt: w.alt, loading: "lazy" }), el("figcaption", { text: w.alt })])); });
     sec.appendChild(v);
-    steps[s.id].forEach(function (h, k) {
+    content(s).forEach(function (h) {
       var state = el("span", { class: "small", style: "margin-left:auto;font-weight:800" });
-      var sum = el("summary", null, [el("span", { class: "badge", style: "background:#17233c", text: "Step " + (k + 1) }), el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title }), state]);
+      var sum = el("summary", null, [el("span", { class: "badge", style: "background:" + (h.step ? "#17233c" : "#5b6b88"), text: h.step ? "Step " + h.step : "Extra" }), el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title }), state]);
       var d = el("details", { class: "pt" }, [sum]);
       d.appendChild(I.detail(h).node);
       rows[h.id] = { det: d, sum: sum, state: state };
       d.addEventListener("toggle", function () {
         if (!d.open) return;
-        if (!unlocked(si, k)) {
-          d.open = false;
-          var first = null;
-          for (var a = 0; a < C.scenes.length && !first; a++) for (var b = 0; b < steps[C.scenes[a].id].length; b++) { var x = steps[C.scenes[a].id][b]; if (!opened[x.id]) { first = "Scene " + C.scenes[a].letter + ", step " + (b + 1) + ": " + x.title; break; } }
-          say("That step is still locked. Do this one first: " + first + "."); return;
-        }
-        say(""); opened[h.id] = true; I.store("ielt_vralt_opened", opened); paint();
+        if (!unlocked(si, h)) { d.open = false; say("That step is still locked. Do this one first: " + firstOpenStep() + "."); return; }
+        say(""); opened[h.id] = true; if (!FREE) I.store("ielt_vralt_opened", opened); paint();
       });
       sec.appendChild(d);
     });

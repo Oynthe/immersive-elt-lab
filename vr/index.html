@@ -27,6 +27,8 @@
   .hs .num{position:absolute;top:-10px;right:-10px;min-width:24px;height:24px;border-radius:12px;background:#fff;color:var(--navy);font-size:.82rem;font-weight:900;line-height:24px;text-align:center;box-shadow:0 1px 4px #0008;padding:0 4px}
   .hs.current .num{background:var(--amber)}
   .hs.done .num{background:#7bd88f}
+  .hs.extra .num{background:#e9edf5;color:#44506b}
+  .hs.extra.done .num{background:#7bd88f;color:var(--navy)}
   #toast{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);z-index:26;max-width:min(560px,calc(100% - 24px));background:var(--amber);color:var(--navy);font-weight:800;border-radius:12px;padding:.6rem 1rem;box-shadow:0 4px 18px #0007;display:none;text-align:center}
   #toast.show{display:block}
   .tabs button[aria-disabled="true"]{opacity:.55}
@@ -104,27 +106,34 @@
     if (gl && gl.getParameter(gl.MAX_TEXTURE_SIZE) < 3840) lite = true;
   } catch (e) {}
 
-  var opened = I.store("ielt_vr_opened") || {};   // hotspotId -> true
+  /* Reference view (?free=1, optionally &scene=<scene id>): every point is open, nothing is locked, nothing is stored,
+     no progress is reported and no checkpoint word is shown. It is for looking a scene up again during the design
+     sprint; it does not count as the tour. */
+  var FREE = I.qs("free") === "1";
+  if (FREE) document.body.classList.add("free");
+  var opened = FREE ? {} : (I.store("ielt_vr_opened") || {});   // hotspotId -> true
   var byId = {}, sceneOf = {}, nodes = {}, sceneSteps = {};
+  var plan = I.vrPlan(CITY);   // sets h.step (required, numbered) or h.extra (optional) on every content point
   CITY.scenes.forEach(function (s) {
-    var k = 0; sceneSteps[s.id] = [];
-    s.hotspots.forEach(function (h) { byId[h.id] = h; sceneOf[h.id] = s.id; if (h.type !== "go") { k++; h.step = k; sceneSteps[s.id].push(h.id); } });
+    sceneSteps[s.id] = plan[s.id].required.map(function (h) { return h.id; });
+    s.hotspots.forEach(function (h) { byId[h.id] = h; sceneOf[h.id] = s.id; });
   });
-  var REQ = (CITY.vrCompletion && CITY.vrCompletion.requiredPerScene) || null;   // null = every numbered step
   var panel = document.getElementById("panel"), guide = document.getElementById("guide"), guideBtn = document.getElementById("guideBtn"), toastEl = document.getElementById("toast");
   var lastFocus = null, viewer = null, current = null, announcedDone = false, toastTimer = null;
   var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---- sequence rules: steps are done in order inside a scene; a scene opens when the scenes before it are finished */
   function sceneIndex(sid) { for (var i = 0; i < CITY.scenes.length; i++) if (CITY.scenes[i].id === sid) return i; return -1; }
-  function requiredIds(sid) { var a = sceneSteps[sid]; return REQ ? a.slice(0, REQ) : a; }
+  function requiredIds(sid) { return sceneSteps[sid]; }
   function sceneDone(sid) { return requiredIds(sid).every(function (id) { return opened[id]; }); }
-  function sceneUnlocked(sid) { var i = sceneIndex(sid); for (var j = 0; j < i; j++) if (!sceneDone(CITY.scenes[j].id)) return false; return true; }
+  function sceneUnlocked(sid) { if (FREE) return true; var i = sceneIndex(sid); for (var j = 0; j < i; j++) if (!sceneDone(CITY.scenes[j].id)) return false; return true; }
   function nextStep(sid) { var a = sceneSteps[sid]; for (var j = 0; j < a.length; j++) if (!opened[a[j]]) return byId[a[j]]; return null; }
+  /* A point opens when every required step that comes before it in its scene is done. Optional extras follow the same rule. */
   function stepUnlocked(h) {
+    if (FREE) return true;
     var sid = sceneOf[h.id]; if (!sceneUnlocked(sid)) return false;
-    var a = sceneSteps[sid], idx = a.indexOf(h.id);
-    for (var j = 0; j < idx; j++) if (!opened[a[j]]) return false;
+    var hs = CITY.scenes[sceneIndex(sid)].hotspots;
+    for (var j = 0; j < hs.length; j++) { if (hs[j] === h) break; if (hs[j].step && !opened[hs[j].id]) return false; }
     return true;
   }
   function toast(msg) {
@@ -143,35 +152,40 @@
   function tooltip(div, h) {
     div.classList.add("hs", "hs-" + h.type);
     div.setAttribute("role", "button"); div.setAttribute("tabindex", "0");
-    div.innerHTML = ICON[h.type] + (h.step ? '<span class="num"></span>' : "") + '<span class="tip"></span>';
+    div.innerHTML = ICON[h.type] + (h.step || h.extra ? '<span class="num"></span>' : "") + '<span class="tip"></span>';
     if (h.step) div.querySelector(".num").textContent = String(h.step);
-    div.querySelector(".tip").textContent = (h.step ? h.step + ". " : "") + h.title;
+    if (h.extra) { div.querySelector(".num").textContent = "+"; div.classList.add("extra"); }
+    div.querySelector(".tip").textContent = (h.step ? h.step + ". " : h.extra ? "Extra: " : "") + h.title;
     div.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); activate(h, div); } });
     nodes[h.id] = div; paintOne(h);
   }
   function paintOne(h) {
     var n = nodes[h.id]; if (!n) return;
     var locked = h.type === "go" ? !sceneUnlocked(h.to) : !stepUnlocked(h);
-    var cur = h.type === "go" ? (!locked && sceneDone(sceneOf[h.id]) && sceneIndex(h.to) > sceneIndex(sceneOf[h.id])) : (!locked && !opened[h.id]);
+    var cur = FREE ? false : h.type === "go" ? (!locked && sceneDone(sceneOf[h.id]) && sceneIndex(h.to) > sceneIndex(sceneOf[h.id])) : (!locked && !opened[h.id] && !h.extra);
     n.classList.toggle("locked", locked); n.classList.toggle("done", !!opened[h.id]); n.classList.toggle("current", cur);
     n.setAttribute("aria-disabled", locked ? "true" : "false");
-    n.setAttribute("aria-label", (h.step ? "Step " + h.step + ", " : "") + I.TYPE_LABEL[h.type] + ": " + h.title + (locked ? " (locked: finish the earlier steps first)" : opened[h.id] ? " (done)" : ""));
+    n.setAttribute("aria-label", (h.step ? "Step " + h.step + ", " : h.extra ? "Optional extra, " : "") + I.TYPE_LABEL[h.type] + ": " + h.title + (locked ? " (locked: finish the earlier steps first)" : opened[h.id] ? (FREE ? " (opened)" : " (done)") : ""));
   }
   function activate(h, node) {
     if (h.type === "go") {
       if (!sceneUnlocked(h.to)) { var n0 = nextStep(sceneOf[h.id]); toast(n0 ? "Finish this scene first. Next: step " + n0.step + ", " + n0.title + "." : lockedMessage(h.to)); return; }
       viewer.loadScene(h.to); return;
     }
-    if (!stepUnlocked(h)) { var nx = nextStep(sceneOf[h.id]); toast("This is step " + h.step + ". Do step " + nx.step + " first: " + nx.title + "."); return; }
+    if (!stepUnlocked(h)) {
+      var nx = sceneUnlocked(sceneOf[h.id]) ? nextStep(sceneOf[h.id]) : null;
+      toast(nx ? (h.step ? "This is step " + h.step + ". " : "This extra opens later. ") + "Do step " + nx.step + " first: " + nx.title + "." : lockedMessage(sceneOf[h.id]));
+      return;
+    }
     lastFocus = node || nodes[h.id] || guideBtn;
-    opened[h.id] = true; I.store("ielt_vr_opened", opened);
+    opened[h.id] = true; if (!FREE) I.store("ielt_vr_opened", opened);
     var d = I.detail(h);
     panel.innerHTML = "";
     var close = el("button", { class: "close", "aria-label": "Close details", text: "×", onclick: closePanel });
     panel.appendChild(close);
-    panel.appendChild(el("p", { class: "small", style: "margin:0 0 .3rem;font-weight:800", text: "Step " + h.step + " of " + sceneSteps[sceneOf[h.id]].length + " in this scene" }));
+    panel.appendChild(el("p", { class: "small", style: "margin:0 0 .3rem;font-weight:800", text: FREE ? "Reference view" : h.step ? "Step " + h.step + " of " + sceneSteps[sceneOf[h.id]].length + " in this scene" : "Optional extra (not needed for the checkpoint word)" }));
     panel.appendChild(d.node);
-    panel.appendChild(el("p", null, [el("button", { class: "btn dark", type: "button", text: "Done: go to the next step", onclick: closePanel })]));
+    panel.appendChild(el("p", null, [el("button", { class: "btn dark", type: "button", text: FREE ? "Close" : "Done: go to the next step", onclick: closePanel })]));
     panel.classList.add("open"); d.heading.focus();
     refresh();
   }
@@ -180,6 +194,7 @@
     var was = panel.classList.contains("open");
     panel.classList.remove("open");
     if (!was) return;
+    if (FREE) { if (lastFocus && lastFocus.focus) lastFocus.focus(); return; }
     // guide the participant to what comes next
     var nx = nextStep(current), target = nx;
     if (!nx) { var sc = CITY.scenes[sceneIndex(current)]; target = sc.hotspots.filter(function (h) { return h.type === "go" && sceneIndex(h.to) > sceneIndex(current); })[0] || null; }
@@ -199,7 +214,7 @@
   }
   function refresh() {
     var p = progress();
-    document.getElementById("status").textContent = p.complete ? "Tour complete" : ("Step " + Math.min(p.done + 1, p.total) + " of " + p.total);
+    document.getElementById("status").textContent = FREE ? "Reference view" : p.complete ? "Tour complete" : ("Step " + Math.min(p.done + 1, p.total) + " of " + p.total);
     Object.keys(byId).forEach(function (id) { paintOne(byId[id]); });
     // tabs
     var tabs = document.getElementById("tabs"); tabs.innerHTML = "";
@@ -208,7 +223,7 @@
       var b = el("button", { type: "button", "aria-current": s.id === current ? "true" : "false", "aria-disabled": un ? "false" : "true",
         "aria-label": "Scene " + s.letter + ", " + s.short + ", " + dn + " of " + all + " steps done" + (un ? "" : ", locked"),
         onclick: function () { if (!sceneUnlocked(s.id)) { toast(lockedMessage(s.id)); return; } if (s.id !== current) viewer.loadScene(s.id); } },
-        [(un ? "" : "🔒 ") + s.letter + " · " + s.short, el("span", { class: "count", text: dn + "/" + all })]);
+        [(un ? "" : "🔒 ") + s.letter + " · " + s.short, FREE ? null : el("span", { class: "count", text: dn + "/" + all })]);
       tabs.appendChild(b);
     });
     // guide list
@@ -217,17 +232,18 @@
     if (sc) {
       guide.appendChild(el("h2", { text: sc.title }));
       guide.appendChild(el("p", { text: sc.summary }));
-      guide.appendChild(el("p", { text: "Do the steps in order. A step opens when the one before it is done." }));
+      guide.appendChild(el("p", { text: FREE ? "Reference view: every point is open. This view does not count as the tour." : "Do the steps in order. A step opens when the one before it is done." }));
       sc.hotspots.forEach(function (h) {
-        var locked = h.type === "go" ? !sceneUnlocked(h.to) : !stepUnlocked(h), isCur = !locked && !opened[h.id] && h.type !== "go";
+        var locked = h.type === "go" ? !sceneUnlocked(h.to) : !stepUnlocked(h), isCur = !FREE && !locked && !opened[h.id] && h.type !== "go" && !h.extra;
         guide.appendChild(el("button", { type: "button", "aria-disabled": locked ? "true" : "false", onclick: function () {
           if (!locked && h.type !== "go") viewer.lookAt(h.pitch, h.yaw, viewer.getHfov(), calm ? 0 : 700);
           activate(h, guideBtn);
-        } }, [el("span", { class: "n" + (opened[h.id] ? " ok" : isCur ? " cur" : ""), text: h.step ? String(h.step) : "→" }),
+        } }, [el("span", { class: "n" + (opened[h.id] ? " ok" : isCur ? " cur" : ""), text: h.step ? String(h.step) : h.extra ? "+" : "→" }),
               el("span", { class: "badge t-" + h.type, text: I.TYPE_LABEL[h.type] }), el("span", { text: h.title }),
               opened[h.id] ? el("span", { class: "tick", "aria-label": "done", text: "✓" }) : (locked ? el("span", { class: "tick", style: "color:#cfd6e4", "aria-label": "locked", text: "🔒" }) : null)]));
       });
     }
+    if (FREE) return;   /* the reference view reports nothing and shows no checkpoint word */
     I.report("vr", { mode: "vr", opened: Object.keys(opened), scenes: p.scenesDone, total: p.done, required: p.total, complete: p.complete });
     if (p.complete && !announcedDone) {
       announcedDone = true;
@@ -245,6 +261,10 @@
   // resume at the first scene that is not finished
   var first = CITY.scenes[0].id;
   for (var q = 0; q < CITY.scenes.length; q++) { first = CITY.scenes[q].id; if (!sceneDone(first)) break; }
+  if (FREE) {
+    first = sceneIndex(I.qs("scene")) >= 0 ? I.qs("scene") : CITY.scenes[0].id;
+    document.querySelector("#bar .sub").textContent = "Reference view · every point is open · this view does not count as the tour and shows no checkpoint word";
+  }
   var cfg = { default: { firstScene: first, sceneFadeDuration: 700, autoLoad: true, showControls: true, keyboardZoom: true, mouseZoom: true, hfov: 100, minHfov: 50, maxHfov: 110, minPitch: -78, maxPitch: 78, strings: { loadingLabel: "Loading the scene…" } }, scenes: {} };
   CITY.scenes.forEach(function (s) {
     cfg.scenes[s.id] = { type: "equirectangular", title: "", panorama: lite ? s.imageLite : s.image, yaw: s.yaw, pitch: s.pitch,
@@ -256,12 +276,12 @@
     viewer = pannellum.viewer("pano", cfg);
     current = cfg.default.firstScene;
     viewer.on("load", function () { document.getElementById("loader").classList.add("hide"); refresh(); });
-    viewer.on("scenechange", function (id) { current = id; panel.classList.remove("open"); refresh(); I.report("vr", { mode: "vr", event: "scene", scene: id }); });
+    viewer.on("scenechange", function (id) { current = id; panel.classList.remove("open"); refresh(); if (!FREE) I.report("vr", { mode: "vr", event: "scene", scene: id }); });
     viewer.on("error", function (m) {
       var l = document.getElementById("loader"); l.classList.remove("hide");
       l.innerHTML = '<p><strong>The 360° scene could not be displayed on this device.</strong></p><p><a class="btn" href="../alt/vr.html">Open the static version</a></p>';
     });
-    window.__ieltViewer = viewer; window.__ieltVr = { activate: activate, byId: byId, opened: opened, stepUnlocked: stepUnlocked, sceneUnlocked: sceneUnlocked };
+    window.__ieltViewer = viewer; window.__ieltVr = { activate: activate, byId: byId, opened: opened, stepUnlocked: stepUnlocked, sceneUnlocked: sceneUnlocked, sceneSteps: sceneSteps, free: FREE };
   } catch (e) {
     document.getElementById("loader").innerHTML = '<p><strong>The 360° viewer is not supported by this browser.</strong></p><p><a class="btn" href="../alt/vr.html">Open the static version</a></p>';
   }

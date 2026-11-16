@@ -150,7 +150,12 @@ window.CITY = {
      a scene opens only when the scenes before it are finished. requiredPerScene: null means every numbered
      step is required; set a number (for example 3) to require only the first steps of each scene if the
      6-minute slot proves too short in the pilot. */
-  vrCompletion: { sequential: true, requiredPerScene: null },
+  /* requiredIds: null = every numbered step is required (17 steps). To shorten the tour and still keep one learner
+     step and the Teacher lens in every scene, list the step ids that stay required, in order, for example
+     ["A1", "A4", "A5", "B2", "B3", "B6", "C1", "C4", "C6"]; the other points then become optional extras.
+     requiredPerScene: a number n makes the first n steps of each scene required (this drops the Teacher lens steps,
+     so prefer requiredIds). Decide the list with the timed pilot (Research_Design_Protocol.md, section 12). */
+  vrCompletion: { sequential: true, requiredPerScene: null, requiredIds: null },
 
   /* ---------------------------------------------------------------- AR */
   /* Target plane: width 1, height 0.625 (1600 x 1000 px). u, v are fractions of the target image from its top-left corner. */
@@ -159,7 +164,7 @@ window.CITY = {
     { id: "brochure", index: 0, letter: "A", title: "Augmented Tourist Brochure", target: "../assets/targets/brochure.png",
       printed: "The printed brochure lists opening times and prices for three places. Printed information goes out of date.",
       learnerTask: "It is 12:30. Use today's live information to re-plan the printed 'one afternoon' route. Tell your partner what you would change, and why.",
-      lens: "The brochure is printed; the overlay is live. Which language functions does that gap create (for example reporting changes or re-planning)? Could a slide with the same updates do the same job?",
+      lens: "The brochure is printed; the overlay stands for live information (in this workshop its content is scripted and does not change). Which language functions does that gap create (for example reporting changes or re-planning)? Could a slide with the same updates do the same job?",
       items: [
         { id: "arA1", u: 0.165, v: 0.40, kind: "live", label: "Market Hall", chip: "TODAY", lines: ["Closes 14:00", "Food tour 11:00: FULL"], colour: "#c2452d",
           text: "Live information: the Market Hall closes at 14:00 today. The 11:00 food tour is already full." },
