@@ -4,10 +4,11 @@
  *   The same four words must be set in the portal (Admin > Settings > Checkpoint words).
  *   The portal records which word was entered, so the access mode (VR / static alternative,
  *   camera AR / non-camera alternative) is documented for every participant.
- * portalUrl: optional. The Apps Script web app URL, used only for "Return to the portal" links.
+ * portalUrl: the address of the workshop portal page (folder portal/ of this site), for "Return to the portal" links.
+ *   The portal page talks to the Apps Script web app named in portal/config.js.
  */
 window.IELT_CONFIG = {
   checkpoints: { vr: "COMPASS", vrAlt: "ATLAS", ar: "LANTERN", arAlt: "BEACON" },
-  portalUrl: "https://script.google.com/macros/s/AKfycbzbGl28h4voJ_WeEz5_ts7j1KoHqwW-iJ8YGEyYDSZe8y8vbIk0sm-wwEei7UyQo-8X/exec",
-  siteVersion: "1.2.1"
+  portalUrl: "https://oynthe.github.io/immersive-elt-lab/portal/",
+  siteVersion: "1.3.0"
 };
