@@ -804,9 +804,10 @@
       g.brief ? el("p", {}, [el("strong", { text: "Challenge brief " + g.brief.no + ": " }), g.brief.context + ". Learners: " + g.brief.learners + ". Target: " + g.brief.target + "."]) : null,
       el("p", { class: "muted", text: "Your group will review the design of Group " + g.reviewsNo + ", and Group " + g.reviewedByNo + " will review yours." })]));
     else root.appendChild(card("notice", [el("p", { text: "Groups have not been assigned yet. The facilitator does this before the design sprint." })]));
-    if (b.research && b.research.enabled) root.appendChild(card("", [el("h3", { text: "Research (optional)" }),
-      el("p", { text: "You can choose to take part in a research study. It is separate from the workshop and never affects your certificate." }),
-      el("button", { class: "btn", type: "button", text: "Read about the research", onclick: function () { IELT.go("research"); } })]));
+    if (b.research && b.research.enabled) root.appendChild(card(st.index === 0 ? "notice" : "", [el("h3", { text: "Individual Tasks" }),
+      el("p", {}, [el("strong", { text: "Everyone does these. " }), "Before the workshop: a few background questions and one short design task (about 10 minutes). This part closes when the workshop starts. After the workshop: one design task and two reflection questions."]),
+      el("p", { class: "muted", text: "You also decide there whether your answers may be used in the research. Your certificate does not depend on these tasks." }),
+      el("button", { class: "btn primary", type: "button", text: "Open Individual Tasks", onclick: function () { IELT.go("research"); } })]));
     IELT.current = { onPoll: function (res) { if (res.groupStamp !== undefined && res.groupStamp !== boot().groupStamp) IELT.refreshBoot().then(function () { IELT.go("welcome", true); }, function () {}); } };
   } };
 
@@ -1251,10 +1252,12 @@
 
 /* ===== JsResearch.html ===== */
 /*
- * JsResearch: the optional Research module. Consent, background questions, the individual design
- * task before the workshop (T0) and after it (T2), the scale (shown only if the administrator has
- * entered its six items) and two reflection prompts after the workshop.
- * Nothing in this module is needed for any other step or for the certificate.
+ * JsResearch: the Individual Tasks module. The information sheet with the choice about research use,
+ * background questions, the individual design task before the workshop (T0) and after it (T2), the
+ * scale (shown only if the administrator has entered its six items) and two reflection prompts after
+ * the workshop. The tasks are part of the workshop for every participant (decision D-33); the choice
+ * decides only whether the answers may be used in the research. Nothing in this module is needed for
+ * any other step or for the certificate.
  */
 (function () {
   "use strict";
@@ -1278,9 +1281,10 @@
       clear(view); timerNode = null; closeNode = null; closeAt = 0;
       IELT.state.boot.research = { enabled: st.enabled, status: st.status };
       view.appendChild(card("instructions", [
-        el("p", {}, [el("strong", { text: "Taking part in the research is optional." }), " It is separate from the workshop. Your workshop activities and your certificate are exactly the same whether or not you take part."])]));
-      if (!st.enabled) { view.appendChild(card("notice", [el("p", { text: "The research part is not open at the moment." })])); return; }
-      if (st.status !== "agree") { consentView(st); return; }
+        el("p", {}, [el("strong", { text: "The individual tasks are part of the workshop for every participant." }), " A few background questions and one design task before the workshop, one design task and two reflection questions after it."]),
+        el("p", { text: "Whether your answers may also be used in the research is your decision. It changes nothing in your workshop, and your certificate does not depend on these tasks." })]));
+      if (!st.enabled) { view.appendChild(card("notice", [el("p", { text: "The individual tasks are not open at the moment." })])); return; }
+      if (st.status === "none") { consentView(st); return; }
       participantView(st);
     }
     function decide(decision, button, box, confirmText) {
@@ -1290,14 +1294,12 @@
     function consentView(st) {
       var msg = el("div", {});
       var text = el("div", { class: "card", tabindex: "0", role: "region", "aria-label": "Information sheet", style: "white-space:pre-wrap;max-height:26rem;overflow:auto" }, [st.consentText]);
-      var yes = el("button", { class: "btn go", type: "button", text: "I agree to take part" });
-      var no = el("button", { class: "btn", type: "button", text: "I do not want to take part" });
+      var yes = el("button", { class: "btn go", type: "button", text: "My answers may be used in the research" });
+      var no = el("button", { class: "btn", type: "button", text: "Do not use my answers in the research" });
       yes.addEventListener("click", function () { decide("agree", yes, msg); });
       no.addEventListener("click", function () { decide("decline", no, msg); });
-      var note = st.status === "decline" ? "You chose not to take part. Nothing else is needed. You can change your mind while the study is open."
-        : st.status === "withdraw" ? "You have withdrawn. Your individual research records are excluded from the research data. You may join again if you wish." : "";
-      IELT.add(view, [el("h3", { text: "Information sheet (version " + st.consentVersion + ")" }), text, note ? IELT.message("info", note) : null,
-        card("", [el("p", { text: "Please read the information sheet before you decide." }), el("div", { class: "row" }, [yes, st.status === "none" ? no : null]), msg])]);
+      IELT.add(view, [el("h3", { text: "Information sheet (version " + st.consentVersion + ")" }), text,
+        card("", [el("p", { text: "Please read the information sheet. Then choose. You do the tasks in both cases; your choice decides only whether your answers are used in the research." }), el("div", { class: "row" }, [yes, no]), msg])]);
     }
     function participantView(st) {
       var w = st.windows, now = IELT.serverNow(), t0 = st.occasions.T0, t2 = st.occasions.T2;
@@ -1305,7 +1307,8 @@
       var list = el("ul", { class: "steps" }, [item(st.backgroundDone, "Background questions"), item(t0.taskDone, "Design task before the workshop"),
         st.scale.enabled ? item(t0.scaleDone, "Short questionnaire before the workshop") : null, item(t2.taskDone, "Design task after the workshop"),
         st.scale.enabled ? item(t2.scaleDone, "Short questionnaire after the workshop") : null, item(st.reflectionDone, "Two optional reflection questions after the workshop")]);
-      view.appendChild(card("success", [el("p", {}, [el("strong", { text: "You are taking part in the research. Thank you." })]), list]));
+      view.appendChild(card(st.dataUse ? "success" : "notice", [el("p", {}, [el("strong", { text: st.dataUse ? "Your answers may be used in the research. Thank you." : "Your answers will not be used in the research." }),
+        st.dataUse ? "" : " The tasks below are still part of your workshop."]), el("h3", { text: "Your individual tasks" }), list]));
       var active = false;
       /* background */
       if (!st.backgroundDone) { view.appendChild(backgroundForm(st)); active = true; }
@@ -1320,16 +1323,23 @@
       if (!active && t2.taskDone && !st.reflectionDone) { view.appendChild(reflectionForm(st)); active = true; }
       if (!active) {
         var text = !t0.taskDone && w.T0.opensAt && now < w.T0.opensAt ? "The pre-workshop part opens in " + span(w.T0.opensAt - now) + " (72 hours before the workshop)."
-          : t0.started && !t0.taskDone && !w.T2.opensAt ? "The pre-workshop part closed when the workshop started. The design task you began was not submitted, so it is not part of the research data. The next research part opens when the workshop closes. You will find it here."
-          : !t2.taskDone && !w.T2.opensAt ? "The next research part opens when the workshop closes. You will find it here."
-          : !t2.taskDone ? "The post-workshop window has closed." : "You have completed every research part. Thank you.";
+          : t0.started && !t0.taskDone && !w.T2.opensAt ? "The pre-workshop part closed when the workshop started. The design task you began was not submitted, so it was not recorded. The next part opens when the workshop closes. You will find it here."
+          : !t2.taskDone && !w.T2.opensAt ? "The next part opens when the workshop closes. You will find it here."
+          : !t2.taskDone ? "The post-workshop part has closed." : "You have completed every individual task. Thank you.";
         view.appendChild(card("notice", [el("p", { role: "status", text: text })]));
       } else if (w.T0.open && !t0.taskDone) view.appendChild(el("p", { class: "small muted", text: "The pre-workshop part closes when the workshop starts, in " + span(w.T0.closesAt - now) + "." }));
       else if (w.T2.open && (!t2.taskDone || !st.reflectionDone)) view.appendChild(el("p", { class: "small muted", text: "The post-workshop part stays open for " + span(w.T2.closesAt - now) + ". Doing it now, in the same sitting, is best." }));
-      /* withdraw */
-      var msg = el("div", {}), out = el("button", { class: "btn danger", type: "button", text: "Withdraw from the research" });
-      out.addEventListener("click", function () { decide("withdraw", out, msg, "Withdraw from the research? Your individual research records will be excluded from the research data. Your workshop participation and certificate are not affected."); });
-      view.appendChild(card("", [el("h3", { text: "Changing your mind" }), el("p", { class: "muted", text: "You can withdraw at any time, without giving a reason." }), out, msg]));
+      /* changing the choice about research use */
+      var msg = el("div", {});
+      if (st.dataUse) {
+        var out = el("button", { class: "btn danger", type: "button", text: "Withdraw from the research" });
+        out.addEventListener("click", function () { decide("withdraw", out, msg, "Withdraw from the research? Your answers will be excluded from the research data. The tasks stay part of your workshop, and your certificate is not affected."); });
+        view.appendChild(card("", [el("h3", { text: "Changing your mind" }), el("p", { class: "muted", text: "You can stop the use of your answers in the research at any time, without giving a reason." }), out, msg]));
+      } else {
+        var allow = el("button", { class: "btn", type: "button", text: "Allow the use of my answers in the research" });
+        allow.addEventListener("click", function () { decide("agree", allow, msg); });
+        view.appendChild(card("", [el("h3", { text: "Changing your mind" }), el("p", { class: "muted", text: st.status === "withdraw" ? "You have withdrawn: your answers are excluded from the research data. You can allow their use again at any time." : "You can allow the use of your answers at any time while the study is open." }), allow, msg]));
+      }
     }
     /* Background questions B1 to B7, exactly as served by the server (03_INSTRUMENTS/Background_Questions.md). Every question may be left empty. */
     function backgroundForm(st) {
@@ -1492,7 +1502,7 @@
 /* ===== JsCertificate.html ===== */
 /*
  * JsCertificate: the Certificate Center.
- * The server decides eligibility (nine educational steps, never research). Only if the participant is
+ * The server decides eligibility (nine educational steps, never the individual tasks or the research choice). Only if the participant is
  * eligible and a template is active does it send the template, the verified registered name and the
  * placement settings. The PDF is then made in this browser by the shared engine (JsCertEngine) with
  * pdf-lib and fontkit from the project's static site, downloaded, and its SHA-256 is reported back.
@@ -1569,7 +1579,7 @@
       clear(view);
       last = st;
       view.appendChild(el("div", { class: "card instructions" }, [
-        el("p", { text: "The certificate confirms that you completed the nine workshop steps below. Taking part in the research is not one of them and never affects the certificate." })]));
+        el("p", { text: "The certificate confirms that you completed the nine workshop steps below. The individual tasks before and after the workshop and your choice about the research are not among them and never affect the certificate." })]));
       view.appendChild(el("div", { class: "card" }, [el("h3", { text: "Your steps" }), el("ul", { class: "steps" }, st.steps.map(function (s) {
         return el("li", { class: s.done ? "ok" : "" }, [el("span", { class: "tick", "aria-hidden": "true", text: s.done ? "✓" : "" }),
           el("span", {}, [el("span", { class: "sr-only", text: s.done ? "Done: " : "Missing: " }), el("strong", { text: s.label }),
@@ -1711,7 +1721,7 @@
     open.addEventListener("click", function () {
       var st = IELT.state.stage, target = chosen || stages[Math.min(st.index + 1, stages.length - 1)].id;
       var idx = stages.map(function (s) { return s.id; }).indexOf(target);
-      var warn = target === "S9" ? "Open S9 Closed? This ends the workshop, makes certificates available and starts the 24-hour window of the optional post-workshop research part."
+      var warn = target === "S9" ? "Open S9 Closed? This ends the workshop, makes certificates available and starts the 24-hour window of the post-workshop individual tasks."
         : idx < st.index ? "Go back to " + target + "? Steps that were already opened stay open." : "";
       if (warn && !window.confirm(warn)) return;
       IELT.run(open, msg, function () {
@@ -1909,10 +1919,13 @@
     body.appendChild(box);
     api("apiAdminResearchSummary", undefined, {}).then(function (s) {
       var tile = function (n, label) { return el("div", {}, [el("b", { text: String(n) }), el("span", { text: label })]); };
-      box.appendChild(IELT.message(s.enabled ? "ok" : "info", s.enabled ? "The research part is open. Consent version: " + s.consentVersion + "." : "The research part is switched off (Settings)."));
-      box.appendChild(el("div", { class: "stat" }, [tile(s.consent.agree, "agreed"), tile(s.consent.decline, "declined"), tile(s.consent.withdraw, "withdrew"), tile(s.consent.none, "not decided"),
+      box.appendChild(IELT.message(s.enabled ? "ok" : "info", s.enabled ? "The individual tasks are open. Information sheet version: " + s.consentVersion + "." : "The individual tasks and the research part are switched off (Settings)."));
+      box.appendChild(el("div", { class: "stat" }, [tile(s.consent.agree, "allow research use"), tile(s.consent.decline, "do not allow it"), tile(s.consent.withdraw, "withdrew"), tile(s.consent.none, "not decided yet"),
         tile(s.formOrder.AB + " / " + s.formOrder.BA, "form order AB / BA"), tile(s.groups.fullyConsenting + " / " + s.groups.total, "groups with full consent")]));
-      box.appendChild(table("Completion (participants who currently consent)", ["Occasion", "Background", "Design task", "Scale", "Reflection"], [
+      if (s.everyone) box.appendChild(table("Completion by everyone (the tasks are a workshop step for all " + s.participants + " participants)", ["Occasion", "Background", "Design task", "Reflection"], [
+        ["Before the workshop", String(s.everyone.background), String(s.everyone.t0Task), ""],
+        ["After the workshop", "", String(s.everyone.t2Task), String(s.everyone.reflection)]]));
+      box.appendChild(table("Research data (participants who currently allow the use of their answers)", ["Occasion", "Background", "Design task", "Scale", "Reflection"], [
         ["T0, before the workshop", String(s.t0.background), String(s.t0.task), s.scaleEnabled ? String(s.t0.scale) : "scale off", ""],
         ["T2, after the workshop", "", String(s.t2.task), s.scaleEnabled ? String(s.t2.scale) : "scale off", String(s.t2.reflection)]]));
       box.appendChild(el("p", { class: "small muted", text: (s.scaleEnabled ? "The scale is on: the ScaleItems sheet holds six items." : "The scale is off: the ScaleItems sheet in the data workbook has no item wording. Paste the six items there only after permission has been obtained.")
@@ -1928,15 +1941,15 @@
       });
     }); });
     body.appendChild(card("", [el("h3", { text: "Research export" }),
-      el("p", { text: "Creates a new spreadsheet in your Google Drive with the records of participants who currently consent, keyed by research ID. Names, emails and internal ids are not exported. It includes a blind rating sheet for each of two raters (the same responses, each in its own random order), the key sheet, and a score sheet for each rater." }),
+      el("p", { text: "Creates a new spreadsheet in your Google Drive with the records of participants who currently allow the research use of their answers, keyed by research ID. Answers of everyone else are never exported. Names, emails and internal ids are not exported. It includes a blind rating sheet for each of two raters (the same responses, each in its own random order), the key sheet, and a score sheet for each rater." }),
       el("p", {}, [el("strong", { text: "Exports contain times of day and elapsed minutes, never dates." })]),
       rule.node, exp, msg, out]));
-    var pMsg = el("div", {}), purge = el("button", { class: "btn danger", type: "button", text: "Remove records of withdrawn participants" });
+    var pMsg = el("div", {}), purge = el("button", { class: "btn danger", type: "button", text: "Remove records that may not be used" });
     purge.addEventListener("click", function () {
-      if (!window.confirm("Delete the individual research records of everyone who has withdrawn? Exports already exclude them; this removes the rows from the data workbook. It cannot be undone.")) return;
-      IELT.run(purge, pMsg, function () { return api("apiAdminPurgeWithdrawn", undefined, { attempts: 1 }).then(function (res) { pMsg.appendChild(IELT.message("ok", res.rowsRemoved + " rows removed.")); }); });
+      if (!window.confirm("Delete the individual task records of everyone who has withdrawn and, once the post-workshop part has closed, of everyone who did not allow research use? Exports already exclude them; this removes the rows from the data workbook. It cannot be undone.")) return;
+      IELT.run(purge, pMsg, function () { return api("apiAdminPurgeWithdrawn", undefined, { attempts: 1 }).then(function (res) { pMsg.appendChild(IELT.message("ok", res.rowsRemoved + " rows removed." + (res.declinedIncluded ? "" : " Records of participants who did not allow research use stay until the post-workshop part has closed."))); }); });
     });
-    body.appendChild(card("", [el("h3", { text: "Withdrawals" }), el("p", { class: "muted", text: "Withdrawn participants are always left out of exports. You can also delete their individual research rows." }), purge, pMsg]));
+    body.appendChild(card("", [el("h3", { text: "Answers that may not be used" }), el("p", { class: "muted", text: "Participants who withdrew or did not allow research use are always left out of exports. You can also delete their individual task rows: at any time for withdrawals, after the post-workshop part has closed for the others." }), purge, pMsg]));
   }
 
   /* ================= Certificates ================= */
@@ -2144,9 +2157,9 @@
       IELT.add(box, [
         card("", [el("h3", { text: "Workshop" }),
           text("STATIC_BASE_URL", "Address of the static VR/AR site", { spellcheck: false, help: "The published project site (https). The portal loads the 360° viewer, the AR targets, fonts and helper scripts from here and from nowhere else." }),
-          text("PORTAL_URL", "Address of this portal (used only in access-code emails)", { spellcheck: false, help: "The web app address that ends in /exec." }),
+          text("PORTAL_URL", "Address of this portal (used only in access-code emails)", { spellcheck: false, help: "The address participants open: the portal page on the project site (it ends in /portal/)." }),
           el("div", { class: "field" }, [el("label", { for: startId, text: "Workshop start (your local date and time)" }),
-            el("div", { class: "help", text: "Opens the pre-workshop research window 72 hours earlier and is the zero point of \"minutes from workshop start\". Set it once, before the window opens. It is kept as a technical value only: records store times of day and elapsed minutes, never dates." }), start]),
+            el("div", { class: "help", text: "Opens the pre-workshop individual tasks 72 hours earlier and is the zero point of \"minutes from workshop start\". Set it once, before the window opens. It is kept as a technical value only: records store times of day and elapsed minutes, never dates." }), start]),
           text("SUPPORT_NOTE", "Note on the sign-in page", { max: 300 }),
           text("ANALYZER_OBJECTIVE", "Objective shown in the Task Analyzer", { rows: 2, max: 300 })]),
         card("", [el("h3", { text: "Registration" }),
@@ -2159,9 +2172,10 @@
         card("", [el("h3", { text: "Checkpoint words" }), el("p", { class: "muted", text: "The same four words must be set in config.js of the static site. They are not secrets: they record which version a participant used. Compared without regard to capital letters." }),
           el("div", { class: "grid2" }, [el("div", {}, [text("WORD_VR", "VR, 360° viewer", { spellcheck: false }), text("WORD_VR_ALT", "VR, static version", { spellcheck: false })]),
             el("div", {}, [text("WORD_AR", "AR, camera", { spellcheck: false }), text("WORD_AR_ALT", "AR, non-camera version", { spellcheck: false })])])]),
-        card("", [el("h3", { text: "Research (optional part)" }),
-          res.consentPlaceholder ? IELT.message("info", "The consent text is still the placeholder. Replace it with the approved information sheet before you switch the research part on.") : null,
-          flag("RESEARCH_ENABLED", "Research part", "Off until the ethics-approved information sheet is in place."),
+        card("", [el("h3", { text: "Individual tasks and research" }),
+          el("p", { class: "muted", text: "When this part is on, every participant is asked to do the individual tasks before and after the workshop. Each participant chooses whether the answers may be used in the research; only those answers are exported. The certificate does not depend on this part." }),
+          res.consentPlaceholder ? IELT.message("info", "The information sheet is still the placeholder. Replace it with the approved information sheet before you switch this part on.") : null,
+          flag("RESEARCH_ENABLED", "Individual tasks and research part", "Off until the ethics-approved information sheet is in place."),
           text("CONSENT_VERSION", "Consent version label", { max: 40, help: "Change the label whenever you change the text." }),
           text("CONSENT_TEXT", "Information sheet and consent text", { rows: 12, max: 20000 }),
           flag("CONSENT_AWARE_GROUPING", "Consent-aware grouping", "Off by default. When on, consenting participants are grouped together so that more groups can be used for research. Trade-off: group membership then hints at consent status. See the protocol."),

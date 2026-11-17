@@ -10,5 +10,5 @@
 window.IELT_CONFIG = {
   checkpoints: { vr: "COMPASS", vrAlt: "ATLAS", ar: "LANTERN", arAlt: "BEACON" },
   portalUrl: "https://oynthe.github.io/immersive-elt-lab/portal/",
-  siteVersion: "1.3.0"
+  siteVersion: "1.3.1"
 };
